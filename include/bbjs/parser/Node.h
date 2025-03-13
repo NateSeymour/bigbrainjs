@@ -9,8 +9,9 @@ namespace bbjs::ast
 {
     struct Empty;
     struct FunctionDefinition;
+    struct NumericLiteral;
 
-    using Node = std::variant<Empty, FunctionDefinition>;
+    using Node = std::variant<Empty, FunctionDefinition, NumericLiteral>;
     using UniqueNode = std::unique_ptr<Node>;
 
     struct Empty
@@ -70,7 +71,7 @@ namespace bbjs::ast
     template<typename NodeT, typename... Args>
     UniqueNode make_node(Args... args)
     {
-        return std::make_unique(Node{NodeT{std::forward<Args>(args)...}});
+        return std::make_unique<Node>(NodeT{std::forward<Args>(args)...});
     }
 } // namespace bbjs::ast
 
