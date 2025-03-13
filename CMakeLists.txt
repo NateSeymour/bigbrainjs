@@ -56,5 +56,6 @@ target_link_libraries(bigbrainjs PUBLIC buffalo ctre::ctre simdjson)
 target_include_directories(bigbrainjs PUBLIC include)
 
 add_executable(bigbrainjs-test test/scripts.test.cpp
-        test/h3.test.cpp)
+        test/h3.test.cpp
+        test/parser.test.cpp)
 target_link_libraries(bigbrainjs-test PRIVATE gtest_main bigbrainjs)

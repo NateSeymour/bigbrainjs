@@ -14,7 +14,7 @@ std::optional<std::filesystem::path> Engine::LocatePackageJson(std::filesystem::
 
     path.make_preferred();
 
-    while ((path = path.parent_path()).has_parent_path())
+    while ((path = path.parent_path()) != path.parent_path())
     {
         if (!std::filesystem::is_directory(path))
         {
