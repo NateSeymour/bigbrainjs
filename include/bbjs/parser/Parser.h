@@ -9,7 +9,7 @@ namespace bbjs::parser
     using ValueType = ast::UniqueNode;
     using GrammarType = bf::GrammarDefinition<ValueType>;
 
-    extern bf::DefineNonTerminal<GrammarType> root;
+    extern bf::DefineNonTerminal<GrammarType, "Root"> Root;
 } // namespace bbjs::parser
 
 #endif // PARSER_H

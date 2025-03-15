@@ -10,8 +10,7 @@ set(BUFFALO_ENABLE_TESTS OFF)
 FetchContent_Declare(
         buffalo
         GIT_REPOSITORY https://github.com/NateSeymour/buffalo.git
-        GIT_TAG v1.1.2
-        GIT_SHALLOW TRUE
+        GIT_TAG v2.0.11
 )
 FetchContent_MakeAvailable(buffalo)
 
@@ -20,7 +19,6 @@ FetchContent_Declare(
         ctre
         GIT_REPOSITORY https://github.com/hanickadot/compile-time-regular-expressions.git
         GIT_TAG v3.9.0
-        GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(ctre)
 
@@ -29,7 +27,6 @@ FetchContent_Declare(
         simdjson
         GIT_REPOSITORY https://github.com/simdjson/simdjson.git
         GIT_TAG v3.12.2
-        GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(simdjson)
 
@@ -38,7 +35,6 @@ FetchContent_Declare(
         gtest
         GIT_REPOSITORY https://github.com/google/googletest.git
         GIT_TAG main
-        GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(gtest)
 

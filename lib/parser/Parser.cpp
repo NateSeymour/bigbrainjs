@@ -19,9 +19,13 @@ bf::DefineTerminal<G, R"(from)"> FROM;
 bf::DefineTerminal<G, R"(const)"> CONST;
 bf::DefineTerminal<G, R"(let)"> LET;
 
+bf::DefineTerminal<G, R"(new)"> NEW;
+
 bf::DefineTerminal<G, R"(for)"> FOR;
 bf::DefineTerminal<G, R"(while)"> WHILE;
 
+bf::DefineTerminal<G, R"(function)"> FUNCTION;
+bf::DefineTerminal<G, R"(this)"> THIS;
 bf::DefineTerminal<G, R"(return)"> RETURN;
 
 bf::DefineTerminal<G, R"(true)"> TRUE;
@@ -34,6 +38,7 @@ bf::DefineTerminal<G, R"(false)"> UNDEFINED;
 bf::DefineTerminal<G, R"(;)"> SEMI;
 bf::DefineTerminal<G, R"(:)"> COLON;
 bf::DefineTerminal<G, R"(\.)"> DOT(bf::Left);
+bf::DefineTerminal<G, R"(\.{3})"> SPREAD;
 bf::DefineTerminal<G, R"(,)"> COMMA;
 
 bf::DefineTerminal<G, R"(\<\<\<)"> LSUS;
@@ -63,6 +68,9 @@ bf::DefineTerminal<G, R"(\/)"> BINOP_DIV(bf::Left);
 bf::DefineTerminal<G, R"(&&)"> BINOP_AND(bf::Left);
 bf::DefineTerminal<G, R"(\|\|)"> BINOP_OR(bf::Left);
 
+bf::DefineTerminal<G, R"(\<)"> BINCOMP_LT(bf::Left);
+bf::DefineTerminal<G, R"(\>)"> BINCOMP_GT(bf::Left);
+
 // LITERALS
 bf::DefineTerminal<G, R"(\d+(\.\d+)?)"> NUMBER([](auto const &tok) {
     return make_node<NumericLiteral>(std::stod(std::string(tok.raw)));
@@ -73,171 +81,167 @@ bf::DefineTerminal<G, R"('[^']*')"> SINGLE_STRING;
 bf::DefineTerminal<G, R"(`[^`]*`)"> FORMAT_STRING;
 
 // IDENTIFIERS
-bf::DefineTerminal<G, R"([a-zA-Z]+)"> IDENTIFIER;
+bf::DefineTerminal<G, R"([a-zA-Z\d]+)"> IDENTIFIER;
 
 /*
  * THE GRAMMAR
+ * Modelled as much as possible after the grammar specification in
+ * https://ecma-international.org/wp-content/uploads/ECMA-262_15th_edition_june_2024.pdf
  */
-// FORWARD DECLS
-extern bf::DefineNonTerminal<G> expression;
-extern bf::DefineNonTerminal<G> expression_list;
-extern bf::DefineNonTerminal<G> scoped_block;
+extern bf::DefineNonTerminal<G, "Expression"> Expression;
+extern bf::DefineNonTerminal<G, "AssignmentExpression"> AssignmentExpression;
 
-// LITERALS
-bf::DefineNonTerminal<G> string_literal
-    = bf::PR<G>(DOUBLE_STRING)
-    | bf::PR<G>(SINGLE_STRING)
-    | bf::PR<G>(FORMAT_STRING)
-    ;
-
-// IDENTIFIERS
-bf::DefineNonTerminal<G> identifier_list
+bf::DefineNonTerminal<G, "Identifier"> Identifier
     = bf::PR<G>(IDENTIFIER)
-    | (identifier_list + COMMA + IDENTIFIER)
-    | (identifier_list + COMMA)
     ;
 
-// OBJECTS
-bf::DefineNonTerminal<G> destructured_object
-    = (CURLY_LEFT + identifier_list + CURLY_RIGHT)
-    ;
-
-bf::DefineNonTerminal<G> object_dot_access
-    = (expression + DOT + IDENTIFIER)
-    ;
-
-bf::DefineNonTerminal<G> object_property
-    = bf::PR<G>(IDENTIFIER)
-    | (IDENTIFIER + COLON + expression)
-    ;
-
-bf::DefineNonTerminal<G> object_property_list
-    = bf::PR<G>(object_property)
-    | (object_property_list + COMMA + object_property)
-    | (object_property_list + COMMA)
-    ;
-
-bf::DefineNonTerminal<G> object
-    = (CURLY_LEFT + CURLY_RIGHT)
-    | (CURLY_LEFT + object_property_list + CURLY_RIGHT)
-    ;
-
-// ARRAY
-bf::DefineNonTerminal<G> array
-    = (SQUARE_LEFT + SQUARE_RIGHT)
-    | (SQUARE_LEFT + expression_list + SQUARE_RIGHT)
-    ;
-
-// FUNCTIONS
-bf::DefineNonTerminal<G> argument_list
-    = bf::PR<G>(expression)
-    | (argument_list + COMMA + expression)
-    ;
-
-bf::DefineNonTerminal<G> function_call
-    = (expression + PAR_LEFT + PAR_RIGHT)
-    | (expression + PAR_LEFT + argument_list + PAR_RIGHT)
-    ;
-
-bf::DefineNonTerminal<G> function_definition_arrow
-    = (PAR_LEFT + identifier_list + PAR_RIGHT + ARROW + scoped_block)
-    | (IDENTIFIER + ARROW + scoped_block)
-    ;
-
-// EXPRESSIONS
-bf::DefineNonTerminal<G> expression
+bf::DefineNonTerminal<G, "Literal"> Literal
     = bf::PR<G>(NUMBER)
-    | bf::PR<G>(IDENTIFIER)
-    | bf::PR<G>(TRUE)
-    | bf::PR<G>(FALSE)
-    | bf::PR<G>(KW_NULL)
-    | bf::PR<G>(UNDEFINED)
-    | bf::PR<G>(DOUBLE_STRING)
-    | bf::PR<G>(SINGLE_STRING)
-    | bf::PR<G>(FORMAT_STRING)
-    | bf::PR<G>(object_dot_access)
-    | bf::PR<G>(function_call)
-    | bf::PR<G>(function_definition_arrow)
-    | bf::PR<G>(object)
-    | bf::PR<G>(array)
-    | (expression + BINOP_ADD + expression)
-    | (expression + BINOP_SUB + expression)
-    | (expression + BINOP_MUL + expression)
-    | (expression + BINOP_DIV + expression)
-    | (expression + BINOP_AND + expression)
-    | (expression + BINOP_OR + expression)
     ;
 
-bf::DefineNonTerminal<G> expression_list
-    = bf::PR<G>(expression)
-    | (expression_list + COMMA + expression)
-    | (expression_list + COMMA)
+bf::DefineNonTerminal<G, "ArrayLiteral"> ArrayLiteral
+    = (SQUARE_LEFT + SQUARE_RIGHT)
     ;
 
-bf::DefineNonTerminal<G> expression_statement
-    = (expression + SEMI)
-    ;
-
-// DECLARATIONS
-bf::DefineNonTerminal<G> declaration_statement
-    = (CONST + IDENTIFIER + EQUAL + expression + SEMI)
-    | (LET + IDENTIFIER + EQUAL + expression + SEMI)
-    ;
-
-// MODULE
-bf::DefineNonTerminal<G> import_target
-    = bf::PR<G>(IDENTIFIER)
-    | bf::PR<G>(destructured_object)
-    ;
-
-bf::DefineNonTerminal<G> import_statement
-    = (IMPORT + import_target + FROM + string_literal + SEMI)
-    ;
-
-// COMMENT
-bf::DefineNonTerminal<G> comment
-    = bf::PR<G>(SINGLE_COMMENT)
-    | bf::PR<G>(MULTI_COMMENT)
-    ;
-
-// RETURN
-bf::DefineNonTerminal<G> return_statement
-    = (RETURN + SEMI)
-    | (RETURN + expression + SEMI)
-    ;
-
-// FOR LOOP
-bf::DefineNonTerminal<G> for_loop
-    = (FOR + PAR_LEFT + declaration_statement + SEMI + expression + SEMI + expression + PAR_RIGHT + scoped_block)
-    ;
-
-// STATEMENT
-bf::DefineNonTerminal<G> statement
-    = bf::PR<G>(SEMI)
-    | bf::PR<G>(comment)
-    | bf::PR<G>(import_statement)
-    | bf::PR<G>(expression_statement)
-    | bf::PR<G>(declaration_statement)
-    | bf::PR<G>(return_statement)
-    | bf::PR<G>(for_loop)
-    ;
-
-bf::DefineNonTerminal<G> statement_list
-    = bf::PR<G>(statement)
-    | (statement_list + statement)
-    ;
-
-// BLOCKS
-bf::DefineNonTerminal<G> unscoped_block
-    = bf::PR<G>(statement_list)
-    ;
-
-bf::DefineNonTerminal<G> scoped_block
+bf::DefineNonTerminal<G, "ObjectLiteral"> ObjectLiteral
     = (CURLY_LEFT + CURLY_RIGHT)
-    | (CURLY_LEFT + statement_list + CURLY_RIGHT)
     ;
+
+bf::DefineNonTerminal<G, "FormalParameter"> FormalParameter
+    = bf::PR<G>(Identifier)
+    ;
+
+extern bf::DefineNonTerminal<G, "TemplateLiteral"> TemplateLiteral;
+
+bf::DefineNonTerminal<G, "FormalParameterList"> FormalParameterList
+    = bf::PR<G>(FormalParameter)
+    | (FormalParameterList + COMMA + FormalParameter)
+    ;
+
+bf::DefineNonTerminal<G, "FormalParameters"> FormalParameters
+    = bf::PR<G>(FormalParameterList)
+    ;
+
+extern bf::DefineNonTerminal<G, "FunctionBody"> FunctionBody;
+
+bf::DefineNonTerminal<G, "FunctionExpression"> FunctionExpression
+    = (FUNCTION + Identifier + PAR_LEFT + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    | (FUNCTION + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "PrimaryExpression"> PrimaryExpression
+    = bf::PR<G>(THIS)
+    | bf::PR<G>(Identifier)
+    | bf::PR<G>(ArrayLiteral)
+    | bf::PR<G>(ObjectLiteral)
+    | bf::PR<G>(FunctionExpression)
+    ;
+
+extern bf::DefineNonTerminal<G, "ConditionalExpression"> ConditionalExpression;
+
+extern bf::DefineNonTerminal<G, "YieldExpression"> YieldExpression;
+
+extern bf::DefineNonTerminal<G, "ArrowFunction"> ArrowFunction;
+
+extern bf::DefineNonTerminal<G, "AsyncArrowFunction"> AsyncArrowFunction;
+
+extern bf::DefineNonTerminal<G, "SuperProperty"> SuperProperty;
+
+extern bf::DefineNonTerminal<G, "MetaProperty"> MetaProperty;
+
+bf::DefineNonTerminal<G, "ArgumentList"> ArgumentList
+    = bf::PR<G>(AssignmentExpression)
+    | (SPREAD + AssignmentExpression)
+    | (ArgumentList + COMMA + AssignmentExpression)
+    | (ArgumentList + COMMA + SPREAD + AssignmentExpression)
+    ;
+
+bf::DefineNonTerminal<G, "Arguments"> Arguments
+    = (PAR_LEFT + PAR_RIGHT)
+    | (PAR_LEFT + ArgumentList + PAR_RIGHT)
+    | (PAR_LEFT + ArgumentList + COMMA + PAR_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "MemberExpression"> MemberExpression
+    = bf::PR<G>(PrimaryExpression)
+    | (MemberExpression + SQUARE_LEFT + Expression + SQUARE_RIGHT)
+    | (MemberExpression + DOT + Identifier)
+    | (MemberExpression + TemplateLiteral)
+    | bf::PR<G>(SuperProperty)
+    | bf::PR<G>(MetaProperty)
+    | (NEW + MemberExpression + Arguments)
+    ;
+
+bf::DefineNonTerminal<G, "NewExpression"> NewExpression
+    = bf::PR<G>(MemberExpression)
+    | (NEW + NewExpression)
+    ;
+
+extern bf::DefineNonTerminal<G, "CallExpression"> CallExpression;
+
+extern bf::DefineNonTerminal<G, "OptionalChain"> OptionalChain;
+
+bf::DefineNonTerminal<G, "OptionalExpression"> OptionalExpression
+    = (MemberExpression + OptionalChain)
+    | (CallExpression + OptionalChain)
+    | (OptionalExpression + OptionalChain)
+    ;
+
+bf::DefineNonTerminal<G, "LeftHandSideExpression"> LeftHandSideExpression
+    = bf::PR<G>(NewExpression)
+    | bf::PR<G>(CallExpression)
+    | bf::PR<G>(OptionalExpression)
+    ;
+
+bf::DefineNonTerminal<G, "AssignmentExpression"> AssignmentExpression
+    = bf::PR<G>(ConditionalExpression)
+    | bf::PR<G>(YieldExpression)
+    | bf::PR<G>(ArrowFunction)
+    | bf::PR<G>(AsyncArrowFunction)
+    | (LeftHandSideExpression + EQUAL + AssignmentExpression)
+    ;
+
+bf::DefineNonTerminal<G, "Expression"> Expression
+    = bf::PR<G>(AssignmentExpression)
+    | (Expression + COMMA + AssignmentExpression)
+    ;
+
+extern bf::DefineNonTerminal<G, "BlockStatement"> BlockStatement;
+extern bf::DefineNonTerminal<G, "VariableStatement"> VariableStatement;
+extern bf::DefineNonTerminal<G, "EmptyStatement"> EmptyStatement;
+extern bf::DefineNonTerminal<G, "ExpressionStatement"> ExpressionStatement;
+extern bf::DefineNonTerminal<G, "IfStatement"> IfStatement;
+extern bf::DefineNonTerminal<G, "BreakableStatement"> BreakableStatement;
+extern bf::DefineNonTerminal<G, "ContinueStatement"> ContinueStatement;
+extern bf::DefineNonTerminal<G, "BreakStatement"> BreakStatement;
+extern bf::DefineNonTerminal<G, "ReturnStatement"> ReturnStatement;
+extern bf::DefineNonTerminal<G, "WithStatement"> WithStatement;
+extern bf::DefineNonTerminal<G, "LabelledStatement"> LabelledStatement;
+extern bf::DefineNonTerminal<G, "ThrowStatement"> ThrowStatement;
+extern bf::DefineNonTerminal<G, "TryStatement"> TryStatement;
+extern bf::DefineNonTerminal<G, "DebuggerStatement"> DebuggerStatement;
+
+bf::DefineNonTerminal<G, "Statement"> Statement
+    = bf::PR<G>(BlockStatement)
+    | bf::PR<G>(VariableStatement)
+    | bf::PR<G>(EmptyStatement)
+    | bf::PR<G>(ExpressionStatement)
+    | bf::PR<G>(IfStatement)
+    | bf::PR<G>(BreakableStatement)
+    | bf::PR<G>(ContinueStatement)
+    | bf::PR<G>(BreakStatement)
+    | bf::PR<G>(ReturnStatement)
+    | bf::PR<G>(WithStatement)
+    | bf::PR<G>(LabelledStatement)
+    | bf::PR<G>(ThrowStatement)
+    | bf::PR<G>(TryStatement)
+    | bf::PR<G>(DebuggerStatement)
+    ;
+
+extern bf::DefineNonTerminal<G, "StatementList"> StatementList;
+
+extern bf::DefineNonTerminal<G, "ScriptBody"> ScriptBody;
+extern bf::DefineNonTerminal<G, "Script"> Script;
 
 // ROOT
-bf::DefineNonTerminal<G> bbjs::parser::root
-    = bf::PR<G>(unscoped_block)
-    ;
+bf::DefineNonTerminal<G, "Root"> bbjs::parser::Root;

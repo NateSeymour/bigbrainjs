@@ -18,6 +18,11 @@ TEST_F(ParserTestRunner, ForLoop)
     this->Test("../test/parser/for-loop.mjs");
 }
 
+TEST_F(ParserTestRunner, Functions)
+{
+    this->Test("../test/parser/functions.mjs");
+}
+
 TEST_F(ParserTestRunner, MultiComment)
 {
     this->Test("../test/parser/multi-comment.mjs");

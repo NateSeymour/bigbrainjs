@@ -97,13 +97,13 @@ std::expected<ExecutionSession, EngineError> Engine::Run(std::filesystem::path p
     // Parse program text
     if (!this->parser_)
     {
-        return std::unexpected<EngineError>{this->parser_.error().message};
+        return std::unexpected<EngineError>{this->parser_.error().what()};
     }
 
     auto result = this->parser_->Parse(script_text);
     if (!result)
     {
-        return std::unexpected<EngineError>{"Failed to parse source text"};
+        return std::unexpected<EngineError>{result.error().what()};
     }
 
     // Compile program text
