@@ -13,6 +13,7 @@ bf::DefineTerminal<G, R"(\/\/.*$)"> SINGLE_COMMENT;
 bf::DefineTerminal<G, R"(\/\*(.)*\*\/)"> MULTI_COMMENT;
 
 // KEYWORDS
+bf::DefineTerminal<G, R"(super)"> SUPER;
 bf::DefineTerminal<G, R"(import)"> IMPORT;
 bf::DefineTerminal<G, R"(from)"> FROM;
 
@@ -38,6 +39,7 @@ bf::DefineTerminal<G, R"(false)"> UNDEFINED;
 bf::DefineTerminal<G, R"(;)"> SEMI;
 bf::DefineTerminal<G, R"(:)"> COLON;
 bf::DefineTerminal<G, R"(\.)"> DOT(bf::Left);
+bf::DefineTerminal<G, R"(\?\.)"> UNCERTAIN_DOT(bf::Left);
 bf::DefineTerminal<G, R"(\.{3})"> SPREAD;
 bf::DefineTerminal<G, R"(,)"> COMMA;
 
@@ -90,6 +92,7 @@ bf::DefineTerminal<G, R"([a-zA-Z\d]+)"> IDENTIFIER;
  */
 extern bf::DefineNonTerminal<G, "Expression"> Expression;
 extern bf::DefineNonTerminal<G, "AssignmentExpression"> AssignmentExpression;
+extern bf::DefineNonTerminal<G, "StatementList"> StatementList;
 
 bf::DefineNonTerminal<G, "Identifier"> Identifier
     = bf::PR<G>(IDENTIFIER)
@@ -122,7 +125,23 @@ bf::DefineNonTerminal<G, "FormalParameters"> FormalParameters
     = bf::PR<G>(FormalParameterList)
     ;
 
-extern bf::DefineNonTerminal<G, "FunctionBody"> FunctionBody;
+bf::DefineNonTerminal<G, "FunctionStatementList"> FunctionStatementList
+    = bf::PR<G>(StatementList)
+    ;
+
+bf::DefineNonTerminal<G, "FunctionBody"> FunctionBody
+    = bf::PR<G>(FunctionStatementList)
+    ;
+
+bf::DefineNonTerminal<G, "FunctionDeclaration"> FunctionDeclaration
+    // Named Function
+    = (FUNCTION + Identifier + PAR_LEFT + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    | (FUNCTION + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+
+    // Anonymous Function
+    | (FUNCTION + PAR_LEFT + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    | (FUNCTION + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    ;
 
 bf::DefineNonTerminal<G, "FunctionExpression"> FunctionExpression
     = (FUNCTION + Identifier + PAR_LEFT + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
@@ -177,9 +196,36 @@ bf::DefineNonTerminal<G, "NewExpression"> NewExpression
     | (NEW + NewExpression)
     ;
 
-extern bf::DefineNonTerminal<G, "CallExpression"> CallExpression;
+extern bf::DefineNonTerminal<G, "CoverCallExpressionAndAsyncArrowHead"> CoverCallExpressionAndAsyncArrowHead;
 
-extern bf::DefineNonTerminal<G, "OptionalChain"> OptionalChain;
+bf::DefineNonTerminal<G, "SuperCall"> SuperCall
+    = (SUPER + Arguments)
+    ;
+
+bf::DefineNonTerminal<G, "ImportCall"> ImportCall
+    = (IMPORT + PAR_LEFT + AssignmentExpression + PAR_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "CallExpression"> CallExpression
+    = bf::PR<G>(CoverCallExpressionAndAsyncArrowHead)
+    | bf::PR<G>(SuperCall)
+    | bf::PR<G>(ImportCall)
+    | (CallExpression + Arguments)
+    | (CallExpression + SQUARE_LEFT + Expression + SQUARE_RIGHT)
+    | (CallExpression + DOT + Identifier)
+    | (CallExpression + TemplateLiteral)
+    ;
+
+bf::DefineNonTerminal<G, "OptionalChain"> OptionalChain
+    = (UNCERTAIN_DOT + Arguments)
+    | (UNCERTAIN_DOT + SQUARE_LEFT + Expression + SQUARE_RIGHT)
+    | (UNCERTAIN_DOT + Identifier)
+    | (UNCERTAIN_DOT + TemplateLiteral)
+    | (OptionalChain + Arguments)
+    | (OptionalChain + SQUARE_LEFT + Expression + SQUARE_RIGHT)
+    | (OptionalChain + DOT + Identifier)
+    | (OptionalChain + TemplateLiteral)
+    ;
 
 bf::DefineNonTerminal<G, "OptionalExpression"> OptionalExpression
     = (MemberExpression + OptionalChain)
@@ -238,10 +284,48 @@ bf::DefineNonTerminal<G, "Statement"> Statement
     | bf::PR<G>(DebuggerStatement)
     ;
 
-extern bf::DefineNonTerminal<G, "StatementList"> StatementList;
+extern bf::DefineNonTerminal<G, "GeneratorDeclaration"> GeneratorDeclaration;
+extern bf::DefineNonTerminal<G, "AsyncFunctionDeclaration"> AsyncFunctionDeclaration;
+extern bf::DefineNonTerminal<G, "AsyncGeneratorDeclaration"> AsyncGeneratorDeclaration;
 
-extern bf::DefineNonTerminal<G, "ScriptBody"> ScriptBody;
-extern bf::DefineNonTerminal<G, "Script"> Script;
+bf::DefineNonTerminal<G, "HoistableDeclaration"> HoistableDeclaration
+    = bf::PR<G>(FunctionDeclaration)
+    | bf::PR<G>(GeneratorDeclaration)
+    | bf::PR<G>(AsyncFunctionDeclaration)
+    | bf::PR<G>(AsyncGeneratorDeclaration)
+    ;
 
-// ROOT
-bf::DefineNonTerminal<G, "Root"> bbjs::parser::Root;
+extern bf::DefineNonTerminal<G, "ClassDeclaration"> ClassDeclaration;
+extern bf::DefineNonTerminal<G, "LexicalDeclaration"> LexicalDeclaration;
+
+bf::DefineNonTerminal<G, "Declaration"> Declaration
+    = bf::PR<G>(HoistableDeclaration)
+    | bf::PR<G>(ClassDeclaration)
+    | bf::PR<G>(LexicalDeclaration)
+    ;
+
+bf::DefineNonTerminal<G, "StatementListItem"> StatementListItem
+    = bf::PR<G>(Statement)
+    | bf::PR<G>(Declaration)
+    ;
+
+bf::DefineNonTerminal<G, "StatementList"> StatementList
+    = bf::PR<G>(StatementListItem)
+    | (StatementList + StatementListItem)
+    ;
+
+bf::DefineNonTerminal<G, "Block"> Block
+    = (CURLY_LEFT + StatementList + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "BlockStatement"> BlockStatement
+    = bf::PR<G>(Block)
+    ;
+
+bf::DefineNonTerminal<G, "ScriptBody"> ScriptBody
+    = bf::PR<G>(StatementList)
+    ;
+
+bf::DefineNonTerminal<G, "Script"> bbjs::parser::Script
+    = bf::PR<G>(ScriptBody)
+    ;
