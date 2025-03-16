@@ -1,7 +1,6 @@
 #include "bbjs/parser/Parser.h"
 
 using namespace bbjs::parser;
-using namespace bbjs::ast;
 
 using G = GrammarType;
 
@@ -29,11 +28,17 @@ bf::DefineTerminal<G, R"(function)"> FUNCTION;
 bf::DefineTerminal<G, R"(this)"> THIS;
 bf::DefineTerminal<G, R"(return)"> RETURN;
 
+bf::DefineTerminal<G, R"(class)"> CLASS;
+bf::DefineTerminal<G, R"(extends)"> EXTENDS;
+bf::DefineTerminal<G, R"(static)"> STATIC;
+bf::DefineTerminal<G, R"(get)"> GET;
+bf::DefineTerminal<G, R"(set)"> SET;
+
 bf::DefineTerminal<G, R"(true)"> TRUE;
 bf::DefineTerminal<G, R"(false)"> FALSE;
 
-bf::DefineTerminal<G, R"(true)"> KW_NULL;
-bf::DefineTerminal<G, R"(false)"> UNDEFINED;
+bf::DefineTerminal<G, R"(null)"> KW_NULL;
+bf::DefineTerminal<G, R"(undefined)"> UNDEFINED;
 
 // SYMBOLS
 bf::DefineTerminal<G, R"(;)"> SEMI;
@@ -42,6 +47,7 @@ bf::DefineTerminal<G, R"(\.)"> DOT(bf::Left);
 bf::DefineTerminal<G, R"(\?\.)"> UNCERTAIN_DOT(bf::Left);
 bf::DefineTerminal<G, R"(\.{3})"> SPREAD;
 bf::DefineTerminal<G, R"(,)"> COMMA;
+bf::DefineTerminal<G, R"(#)"> POUND;
 
 bf::DefineTerminal<G, R"(\<\<\<)"> LSUS;
 bf::DefineTerminal<G, R"(\>\>\>)"> RSUS;
@@ -74,9 +80,7 @@ bf::DefineTerminal<G, R"(\<)"> BINCOMP_LT(bf::Left);
 bf::DefineTerminal<G, R"(\>)"> BINCOMP_GT(bf::Left);
 
 // LITERALS
-bf::DefineTerminal<G, R"(\d+(\.\d+)?)"> NUMBER([](auto const &tok) {
-    return make_node<NumericLiteral>(std::stod(std::string(tok.raw)));
-});
+bf::DefineTerminal<G, R"(\d+(\.\d+)?)"> NUMBER;
 
 bf::DefineTerminal<G, R"("[^"]*")"> DOUBLE_STRING;
 bf::DefineTerminal<G, R"('[^']*')"> SINGLE_STRING;
@@ -91,11 +95,16 @@ bf::DefineTerminal<G, R"([a-zA-Z\d]+)"> IDENTIFIER;
  * https://ecma-international.org/wp-content/uploads/ECMA-262_15th_edition_june_2024.pdf
  */
 extern bf::DefineNonTerminal<G, "Expression"> Expression;
+extern bf::DefineNonTerminal<G, "LeftHandSideExpression"> LeftHandSideExpression;
 extern bf::DefineNonTerminal<G, "AssignmentExpression"> AssignmentExpression;
 extern bf::DefineNonTerminal<G, "StatementList"> StatementList;
 
 bf::DefineNonTerminal<G, "Identifier"> Identifier
     = bf::PR<G>(IDENTIFIER)
+    ;
+
+bf::DefineNonTerminal<G, "PrivateIdentifier"> PrivateIdentifier
+    = (POUND + Identifier)
     ;
 
 bf::DefineNonTerminal<G, "Literal"> Literal
@@ -110,6 +119,10 @@ bf::DefineNonTerminal<G, "ObjectLiteral"> ObjectLiteral
     = (CURLY_LEFT + CURLY_RIGHT)
     ;
 
+extern bf::DefineNonTerminal<G, "StringLiteral"> StringLiteral;
+
+extern bf::DefineNonTerminal<G, "NumericLiteral"> NumericLiteral;
+
 bf::DefineNonTerminal<G, "FormalParameter"> FormalParameter
     = bf::PR<G>(Identifier)
     ;
@@ -123,6 +136,10 @@ bf::DefineNonTerminal<G, "FormalParameterList"> FormalParameterList
 
 bf::DefineNonTerminal<G, "FormalParameters"> FormalParameters
     = bf::PR<G>(FormalParameterList)
+    ;
+
+bf::DefineNonTerminal<G, "UniqueFormalParameters"> UniqueFormalParameters
+    = bf::PR<G>(FormalParameters)
     ;
 
 bf::DefineNonTerminal<G, "FunctionStatementList"> FunctionStatementList
@@ -148,19 +165,153 @@ bf::DefineNonTerminal<G, "FunctionExpression"> FunctionExpression
     | (FUNCTION + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
     ;
 
+extern bf::DefineNonTerminal<G, "AsyncGeneratorMethod"> AsyncGeneratorMethod;
+extern bf::DefineNonTerminal<G, "AsyncGeneratorExpression"> AsyncGeneratorExpression;
+
+extern bf::DefineNonTerminal<G, "AsyncMethod"> AsyncMethod;
+extern bf::DefineNonTerminal<G, "AsyncFunctionExpression"> AsyncFunctionExpression;
+
+extern bf::DefineNonTerminal<G, "GeneratorMethod"> GeneratorMethod;
+extern bf::DefineNonTerminal<G, "GeneratorExpression"> GeneratorExpression;
+
+bf::DefineNonTerminal<G, "ClassStaticBlockStatementList"> ClassStaticBlockStatementList
+    = bf::PR<G>(StatementList)
+    ;
+
+bf::DefineNonTerminal<G, "ClassStaticBlockBody"> ClassStaticBlockBody
+    = bf::PR<G>(ClassStaticBlockStatementList)
+    ;
+
+bf::DefineNonTerminal<G, "ClassStaticBlock"> ClassStaticBlock
+    = (STATIC + CURLY_LEFT + CURLY_RIGHT)
+    = (STATIC + CURLY_LEFT + ClassStaticBlockBody + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "LiteralPropertyName"> LiteralPropertyName
+    = bf::PR<G>(Identifier)
+    | bf::PR<G>(StringLiteral)
+    | bf::PR<G>(NumericLiteral)
+    ;
+
+bf::DefineNonTerminal<G, "ComputedPropertyName"> ComputedPropertyName
+    = (SQUARE_LEFT + AssignmentExpression + SQUARE_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "PropertyName"> PropertyName
+    = bf::PR<G>(LiteralPropertyName)
+    | bf::PR<G>(ComputedPropertyName)
+    ;
+
+bf::DefineNonTerminal<G, "ClassElementName"> ClassElementName
+    = bf::PR<G>(PropertyName)
+    | bf::PR<G>(PrivateIdentifier)
+    ;
+
+bf::DefineNonTerminal<G, "PropertySetParameterList"> PropertySetParameterList
+    = bf::PR<G>(FormalParameter)
+    ;
+
+bf::DefineNonTerminal<G, "MethodDefinition"> MethodDefinition
+    = (ClassElementName + PAR_LEFT + UniqueFormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    | bf::PR<G>(GeneratorMethod)
+    | bf::PR<G>(AsyncMethod)
+    | bf::PR<G>(AsyncGeneratorMethod)
+    | (GET + ClassElementName + PAR_LEFT + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    | (SET + ClassElementName + PAR_LEFT + PropertySetParameterList + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "Initializer"> Initializer
+    = (EQUAL + AssignmentExpression)
+    ;
+
+bf::DefineNonTerminal<G, "FieldDefinition"> FieldDefinition
+    = bf::PR<G>(ClassElementName)
+    | (ClassElementName + Initializer)
+    ;
+
+bf::DefineNonTerminal<G, "ClassElement"> ClassElement
+    = bf::PR<G>(MethodDefinition)
+    | (STATIC + MethodDefinition)
+    | (FieldDefinition + SEMI)
+    | (STATIC + FieldDefinition + SEMI)
+    | bf::PR<G>(ClassStaticBlock)
+    | bf::PR<G>(SEMI)
+    ;
+
+bf::DefineNonTerminal<G, "ClassElementList"> ClassElementList
+    = bf::PR<G>(ClassElement)
+    | (ClassElementList + ClassElement)
+    ;
+
+bf::DefineNonTerminal<G, "ClassBody"> ClassBody
+    = bf::PR<G>(ClassElementList)
+    ;
+
+bf::DefineNonTerminal<G, "ClassHeritage"> ClassHeritage
+    = (EXTENDS + LeftHandSideExpression)
+    ;
+
+bf::DefineNonTerminal<G, "ClassTail"> ClassTail
+    = (CURLY_LEFT + CURLY_RIGHT)
+    | (CURLY_LEFT + ClassBody + CURLY_RIGHT)
+    | (ClassHeritage + CURLY_LEFT + CURLY_RIGHT)
+    | (ClassHeritage + CURLY_LEFT + ClassBody + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "ClassExpression"> ClassExpression
+    = (CLASS + Identifier + ClassTail)
+    | (CLASS + ClassTail)
+    ;
+
+extern bf::DefineNonTerminal<G, "RegularExpressionLiteral"> RegularExpressionLiteral;
+
+extern bf::DefineNonTerminal<G, "BindingPattern"> BindingPattern;
+
+bf::DefineNonTerminal<G, "CoverParenthesizedExpressionAndArrowParameterList"> CoverParenthesizedExpressionAndArrowParameterList
+    = (PAR_LEFT + Expression + PAR_RIGHT)
+    | (PAR_LEFT + Expression + COMMA + PAR_RIGHT)
+    | (PAR_LEFT + PAR_RIGHT)
+    | (PAR_LEFT + SPREAD + Identifier + PAR_RIGHT)
+    | (PAR_LEFT + SPREAD + BindingPattern + PAR_RIGHT)
+    | (PAR_LEFT + Expression + COMMA + SPREAD + Identifier + PAR_RIGHT)
+    | (PAR_LEFT + Expression + COMMA + SPREAD + BindingPattern + PAR_RIGHT)
+    ;
+
 bf::DefineNonTerminal<G, "PrimaryExpression"> PrimaryExpression
     = bf::PR<G>(THIS)
     | bf::PR<G>(Identifier)
     | bf::PR<G>(ArrayLiteral)
     | bf::PR<G>(ObjectLiteral)
     | bf::PR<G>(FunctionExpression)
+    | bf::PR<G>(ClassExpression)
+    | bf::PR<G>(GeneratorExpression)
+    | bf::PR<G>(AsyncFunctionExpression)
+    | bf::PR<G>(AsyncGeneratorExpression)
+    | bf::PR<G>(RegularExpressionLiteral)
+    | bf::PR<G>(CoverParenthesizedExpressionAndArrowParameterList)
     ;
 
 extern bf::DefineNonTerminal<G, "ConditionalExpression"> ConditionalExpression;
 
 extern bf::DefineNonTerminal<G, "YieldExpression"> YieldExpression;
 
-extern bf::DefineNonTerminal<G, "ArrowFunction"> ArrowFunction;
+bf::DefineNonTerminal<G, "ArrowParameters"> ArrowParameters
+    = bf::PR<G>(Identifier)
+    | bf::PR<G>(CoverParenthesizedExpressionAndArrowParameterList)
+    ;
+
+bf::DefineNonTerminal<G, "ExpressionBody"> ExpressionBody
+    = bf::PR<G>(AssignmentExpression)
+    ;
+
+bf::DefineNonTerminal<G, "ConciseBody"> ConciseBody
+    = bf::PR<G>(ExpressionBody)
+    | (CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "ArrowFunction"> ArrowFunction
+    = (ArrowParameters + ARROW + ConciseBody)
+    ;
 
 extern bf::DefineNonTerminal<G, "AsyncArrowFunction"> AsyncArrowFunction;
 
