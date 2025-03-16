@@ -90,7 +90,7 @@ bf::DefineTerminal<G, R"(%)"> PERCENT(bf::Left);
 bf::DefineTerminal<G, R"(!)"> EXCLAMATION;
 bf::DefineTerminal<G, R"(~)"> SQUIGGLE;
 
-bf::DefineTerminal<G, R"(=>)"> ARROW;
+bf::DefineTerminal<G, R"(=\>)"> ARROW;
 
 bf::DefineTerminal<G, R"(===)"> TRIPLE_EQUAL;
 bf::DefineTerminal<G, R"(==)"> DOUBLE_EQUAL;
