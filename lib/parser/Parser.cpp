@@ -59,6 +59,8 @@ bf::DefineTerminal<G, R"(;)"> SEMI;
 bf::DefineTerminal<G, R"(:)"> COLON;
 bf::DefineTerminal<G, R"(\.)"> DOT(bf::Left);
 bf::DefineTerminal<G, R"(\?\.)"> UNCERTAIN_DOT(bf::Left);
+bf::DefineTerminal<G, R"(\?{2})"> DOUBLE_UNCERTAIN;
+bf::DefineTerminal<G, R"(\?)"> UNCERTAIN;
 bf::DefineTerminal<G, R"(\.{3})"> SPREAD;
 bf::DefineTerminal<G, R"(,)"> COMMA;
 bf::DefineTerminal<G, R"(#)"> POUND;
@@ -88,8 +90,13 @@ bf::DefineTerminal<G, R"(\-)"> BINOP_SUB(bf::Left);
 bf::DefineTerminal<G, R"(\*)"> BINOP_MUL(bf::Left);
 bf::DefineTerminal<G, R"(\/)"> BINOP_DIV(bf::Left);
 
+bf::DefineTerminal<G, R"(&)"> BINOP_BIT_AND(bf::Left);
 bf::DefineTerminal<G, R"(&&)"> BINOP_AND(bf::Left);
+
+bf::DefineTerminal<G, R"(\|)"> BINOP_BIT_OR(bf::Left);
 bf::DefineTerminal<G, R"(\|\|)"> BINOP_OR(bf::Left);
+
+bf::DefineTerminal<G, R"(\^)"> BINOP_BIT_XOR(bf::Left);
 
 bf::DefineTerminal<G, R"(\<)"> BINCOMP_LT(bf::Left);
 bf::DefineTerminal<G, R"(\>)"> BINCOMP_GT(bf::Left);
@@ -109,13 +116,16 @@ bf::DefineTerminal<G, R"([a-zA-Z\d]+)"> IDENTIFIER;
  * Modelled as much as possible after the grammar specification in
  * https://ecma-international.org/wp-content/uploads/ECMA-262_15th_edition_june_2024.pdf
  */
-extern bf::DefineNonTerminal<G, "Expression"> Expression;
-extern bf::DefineNonTerminal<G, "LeftHandSideExpression"> LeftHandSideExpression;
-extern bf::DefineNonTerminal<G, "AssignmentExpression"> AssignmentExpression;
+
 extern bf::DefineNonTerminal<G, "Block"> Block;
 extern bf::DefineNonTerminal<G, "Statement"> Statement;
+extern bf::DefineNonTerminal<G, "Expression"> Expression;
 extern bf::DefineNonTerminal<G, "StatementList"> StatementList;
+extern bf::DefineNonTerminal<G, "BindingPattern"> BindingPattern;
 extern bf::DefineNonTerminal<G, "ClassElementName"> ClassElementName;
+extern bf::DefineNonTerminal<G, "CoalesceExpression"> CoalesceExpression;
+extern bf::DefineNonTerminal<G, "AssignmentExpression"> AssignmentExpression;
+extern bf::DefineNonTerminal<G, "LeftHandSideExpression"> LeftHandSideExpression;
 
 bf::DefineNonTerminal<G, "Identifier"> Identifier
     = bf::PR<G>(IDENTIFIER)
@@ -216,8 +226,18 @@ bf::DefineNonTerminal<G, "AsyncFunctionExpression"> AsyncFunctionExpression
     | (ASYNC + FUNCTION + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + AsyncFunctionBody + CURLY_RIGHT)
     ;
 
-extern bf::DefineNonTerminal<G, "GeneratorMethod"> GeneratorMethod;
-extern bf::DefineNonTerminal<G, "GeneratorExpression"> GeneratorExpression;
+bf::DefineNonTerminal<G, "GeneratorBody"> GeneratorBody
+    = bf::PR<G>(FunctionBody)
+    ;
+
+bf::DefineNonTerminal<G, "GeneratorMethod"> GeneratorMethod
+    = (STAR + ClassElementName + PAR_LEFT + UniqueFormalParameters + PAR_RIGHT + CURLY_LEFT + GeneratorBody + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "GeneratorExpression"> GeneratorExpression
+    = (FUNCTION + STAR + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    | (FUNCTION + STAR + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    ;
 
 bf::DefineNonTerminal<G, "ClassStaticBlockStatementList"> ClassStaticBlockStatementList
     = bf::PR<G>(StatementList)
@@ -310,7 +330,75 @@ bf::DefineNonTerminal<G, "ClassExpression"> ClassExpression
 
 extern bf::DefineNonTerminal<G, "RegularExpressionLiteral"> RegularExpressionLiteral;
 
-extern bf::DefineNonTerminal<G, "BindingPattern"> BindingPattern;
+bf::DefineNonTerminal<G, "BindingRestProperty"> BindingRestProperty
+    = (SPREAD + Identifier)
+    ;
+
+bf::DefineNonTerminal<G, "SingleNameBinding"> SingleNameBinding
+    = bf::PR<G>(Identifier)
+    | (Identifier + Initializer)
+    ;
+
+bf::DefineNonTerminal<G, "BindingElement"> BindingElement
+    = bf::PR<G>(SingleNameBinding)
+    | bf::PR<G>(BindingPattern)
+    | bf::PR<G>(BindingPattern + Initializer)
+    ;
+
+bf::DefineNonTerminal<G, "BindingProperty"> BindingProperty
+    = bf::PR<G>(SingleNameBinding)
+    | (PropertyName + COLON + BindingElement)
+    ;
+
+bf::DefineNonTerminal<G, "BindingPropertyList"> BindingPropertyList
+    = bf::PR<G>(BindingProperty)
+    | (BindingPropertyList + COMMA + BindingProperty)
+    ;
+
+bf::DefineNonTerminal<G, "ObjectBindingPattern"> ObjectBindingPattern
+    = (CURLY_LEFT + CURLY_RIGHT)
+    | (CURLY_LEFT + BindingRestProperty + CURLY_RIGHT)
+    | (CURLY_LEFT + BindingPropertyList + CURLY_RIGHT)
+    | (CURLY_LEFT + BindingPropertyList + COMMA + CURLY_RIGHT)
+    | (CURLY_LEFT + BindingPropertyList + COMMA + BindingRestProperty + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "Elision"> Elision
+    = bf::PR<G>(COMMA)
+    | (Elision + COMMA)
+    ;
+
+bf::DefineNonTerminal<G, "BindingElisionElement"> BindingElisionElement
+    = bf::PR<G>(BindingElement)
+    | (Elision + BindingElement)
+    ;
+
+bf::DefineNonTerminal<G, "BindingElementList"> BindingElementList
+    = bf::PR<G>(BindingElisionElement)
+    | (BindingElementList + COMMA + BindingElisionElement)
+    ;
+
+bf::DefineNonTerminal<G, "BindingRestElement"> BindingRestElement
+    = (SPREAD + Identifier)
+    | (SPREAD + BindingPattern)
+    ;
+
+bf::DefineNonTerminal<G, "ArrayBindingPattern"> ArrayBindingPattern
+    = (SQUARE_LEFT + SQUARE_RIGHT)
+    | (SQUARE_LEFT + Elision + SQUARE_RIGHT)
+    | (SQUARE_LEFT + BindingRestElement + SQUARE_RIGHT)
+    | (SQUARE_LEFT + Elision + BindingRestElement + SQUARE_RIGHT)
+    | (SQUARE_LEFT + BindingElementList + SQUARE_RIGHT)
+    | (SQUARE_LEFT + BindingElementList + COMMA + SQUARE_RIGHT)
+    | (SQUARE_LEFT + BindingElementList + COMMA + Elision + SQUARE_RIGHT)
+    | (SQUARE_LEFT + BindingElementList + COMMA + BindingRestElement + SQUARE_RIGHT)
+    | (SQUARE_LEFT + BindingElementList + COMMA + Elision + BindingRestElement + SQUARE_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "BindingPattern"> BindingPattern
+    = bf::PR<G>(ObjectBindingPattern)
+    | bf::PR<G>(ArrayBindingPattern)
+    ;
 
 bf::DefineNonTerminal<G, "CoverParenthesizedExpressionAndArrowParameterList"> CoverParenthesizedExpressionAndArrowParameterList
     = (PAR_LEFT + Expression + PAR_RIGHT)
@@ -336,7 +424,54 @@ bf::DefineNonTerminal<G, "PrimaryExpression"> PrimaryExpression
     | bf::PR<G>(CoverParenthesizedExpressionAndArrowParameterList)
     ;
 
-extern bf::DefineNonTerminal<G, "ConditionalExpression"> ConditionalExpression;
+extern bf::DefineNonTerminal<G, "RelationalExpression"> RelationalExpression;
+
+
+extern bf::DefineNonTerminal<G, "EqualityExpression"> EqualityExpression;
+
+bf::DefineNonTerminal<G, "BitwiseANDExpression"> BitwiseANDExpression
+    = bf::PR<G>(EqualityExpression)
+    | (BitwiseANDExpression + BINOP_BIT_AND + EqualityExpression)
+    ;
+
+bf::DefineNonTerminal<G, "BitwiseXORExpression"> BitwiseXORExpression
+    = bf::PR<G>(BitwiseANDExpression)
+    | bf::PR<G>(BitwiseXORExpression + BINOP_BIT_XOR + BitwiseANDExpression)
+    ;
+
+bf::DefineNonTerminal<G, "BitwiseORExpression"> BitwiseORExpression
+    = bf::PR<G>(BitwiseXORExpression)
+    | (BitwiseORExpression + BINOP_BIT_OR + BitwiseXORExpression)
+    ;
+
+bf::DefineNonTerminal<G, "CoalesceExpressionHead"> CoalesceExpressionHead
+    = bf::PR<G>(CoalesceExpression)
+    | bf::PR<G>(BitwiseORExpression)
+    ;
+
+bf::DefineNonTerminal<G, "CoalesceExpression"> CoalesceExpression
+    = (CoalesceExpressionHead + DOUBLE_UNCERTAIN + BitwiseORExpression)
+    ;
+
+bf::DefineNonTerminal<G, "LogicalANDExpression"> LogicalANDExpression
+    = bf::PR<G>(BitwiseORExpression)
+    | (LogicalANDExpression + BINOP_AND + BitwiseORExpression)
+    ;
+
+bf::DefineNonTerminal<G, "LogicalORExpression"> LogicalORExpression
+    = bf::PR<G>(LogicalANDExpression)
+    | (LogicalORExpression + BINOP_OR + LogicalANDExpression)
+    ;
+
+bf::DefineNonTerminal<G, "ShortCircuitExpression"> ShortCircuitExpression
+    = bf::PR<G>(LogicalORExpression)
+    | bf::PR<G>(CoalesceExpression)
+    ;
+
+bf::DefineNonTerminal<G, "ConditionalExpression"> ConditionalExpression
+    = bf::PR<G>(ShortCircuitExpression)
+    | (ShortCircuitExpression + UNCERTAIN + AssignmentExpression + COLON + AssignmentExpression)
+    ;
 
 extern bf::DefineNonTerminal<G, "YieldExpression"> YieldExpression;
 
@@ -591,10 +726,6 @@ bf::DefineNonTerminal<G, "StatementList"> StatementList
 
 bf::DefineNonTerminal<G, "Block"> Block
     = (CURLY_LEFT + StatementList + CURLY_RIGHT)
-    ;
-
-bf::DefineNonTerminal<G, "BlockStatement"> BlockStatement
-    = bf::PR<G>(Block)
     ;
 
 bf::DefineNonTerminal<G, "ScriptBody"> ScriptBody
