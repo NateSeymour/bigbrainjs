@@ -1,7 +1,6 @@
 #ifndef NODE_H
 #define NODE_H
 
-#include <memory>
 #include <variant>
 #include <vector>
 
@@ -12,7 +11,6 @@ namespace bbjs::ast
     struct NumericLiteral;
 
     using Node = std::variant<Empty, FunctionDefinition, NumericLiteral>;
-    using UniqueNode = std::unique_ptr<Node>;
 
     struct Empty
     {
@@ -23,7 +21,7 @@ namespace bbjs::ast
         std::string_view name;
         std::size_t arg_count;
 
-        std::vector<UniqueNode> statements;
+        std::vector<std::reference_wrapper<Node>> statements;
     };
 
     template<typename T>
@@ -50,14 +48,14 @@ namespace bbjs::ast
             Division,
         };
 
-        UniqueNode lhs;
+        Node &lhs;
         Operation op;
-        UniqueNode rhs;
+        Node &rhs;
     };
 
     struct Return
     {
-        UniqueNode value;
+        Node &value;
     };
 
     struct Export
@@ -67,12 +65,6 @@ namespace bbjs::ast
     struct Import
     {
     };
-
-    template<typename NodeT, typename... Args>
-    UniqueNode make_node(Args... args)
-    {
-        return std::make_unique<Node>(NodeT{std::forward<Args>(args)...});
-    }
 } // namespace bbjs::ast
 
 #endif // NODE_H

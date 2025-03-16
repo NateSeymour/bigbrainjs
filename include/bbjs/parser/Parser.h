@@ -6,7 +6,7 @@
 
 namespace bbjs::parser
 {
-    using ValueType = ast::UniqueNode;
+    using ValueType = ast::Node;
     using GrammarType = bf::GrammarDefinition<ValueType>;
 
     extern bf::DefineNonTerminal<GrammarType, "Script"> Script;
