@@ -14,7 +14,8 @@ std::optional<std::filesystem::path> Engine::LocatePackageJson(std::filesystem::
 
     path.make_preferred();
 
-    while ((path = path.parent_path()) != path.parent_path())
+    auto fs_root = path.root_path();
+    while ((path = path.parent_path()) != fs_root)
     {
         if (!std::filesystem::is_directory(path))
         {
@@ -38,7 +39,7 @@ Package Engine::LoadPackageJson(std::filesystem::path path)
     };
 
     simdjson::ondemand::parser parser{};
-    auto package_json = simdjson::padded_string::load(path.c_str());
+    auto package_json = simdjson::padded_string::load(path.string());
     simdjson::ondemand::document doc = parser.iterate(package_json);
 
     auto root = doc.get_object();
