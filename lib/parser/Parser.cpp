@@ -50,7 +50,7 @@ bf::DefineTerminal<G, R"(with)"> WITH;
 bf::DefineTerminal<G, R"(function)"> FUNCTION;
 bf::DefineTerminal<G, R"(this)"> THIS;
 bf::DefineTerminal<G, R"(return)"> RETURN;
-bf::DefineTerminal<G, R"(yield)"> YIELD;
+bf::DefineTerminal<G, R"(yield)"> YIELD(bf::Left);
 
 bf::DefineTerminal<G, R"(class)"> CLASS;
 bf::DefineTerminal<G, R"(extends)"> EXTENDS;
@@ -135,7 +135,7 @@ bf::DefineTerminal<G, R"('[^']*')"> SINGLE_STRING;
 bf::DefineTerminal<G, R"(`[^`]*`)"> FORMAT_STRING;
 
 // IDENTIFIERS
-bf::DefineTerminal<G, R"([a-zA-Z\d]+)"> IDENTIFIER;
+bf::DefineTerminal<G, R"([a-zA-Z]+)"> IDENTIFIER;
 
 /*
  * THE GRAMMAR
@@ -147,9 +147,11 @@ extern bf::DefineNonTerminal<G, "Block"> Block;
 extern bf::DefineNonTerminal<G, "Arguments"> Arguments;
 extern bf::DefineNonTerminal<G, "Statement"> Statement;
 extern bf::DefineNonTerminal<G, "Expression"> Expression;
+extern bf::DefineNonTerminal<G, "Initializer"> Initializer;
 extern bf::DefineNonTerminal<G, "StatementList"> StatementList;
 extern bf::DefineNonTerminal<G, "BindingPattern"> BindingPattern;
 extern bf::DefineNonTerminal<G, "UnaryExpression"> UnaryExpression;
+extern bf::DefineNonTerminal<G, "MethodDefinition"> MethodDefinition;
 extern bf::DefineNonTerminal<G, "ClassElementName"> ClassElementName;
 extern bf::DefineNonTerminal<G, "MemberExpression"> MemberExpression;
 extern bf::DefineNonTerminal<G, "CoalesceExpression"> CoalesceExpression;
@@ -165,18 +167,6 @@ bf::DefineNonTerminal<G, "PrivateIdentifier"> PrivateIdentifier
     = (POUND + Identifier)
     ;
 
-bf::DefineNonTerminal<G, "Literal"> Literal
-    = bf::PR<G>(NUMBER)
-    ;
-
-bf::DefineNonTerminal<G, "ArrayLiteral"> ArrayLiteral
-    = (SQUARE_LEFT + SQUARE_RIGHT)
-    ;
-
-bf::DefineNonTerminal<G, "ObjectLiteral"> ObjectLiteral
-    = (CURLY_LEFT + CURLY_RIGHT)
-    ;
-
 bf::DefineNonTerminal<G, "StringLiteral"> StringLiteral
     = bf::PR<G>(DOUBLE_STRING)
     | bf::PR<G>(SINGLE_STRING)
@@ -184,6 +174,60 @@ bf::DefineNonTerminal<G, "StringLiteral"> StringLiteral
 
 bf::DefineNonTerminal<G, "NumericLiteral"> NumericLiteral
     = bf::PR<G>(NUMBER)
+    ;
+
+bf::DefineNonTerminal<G, "NullLiteral"> NullLiteral
+    = bf::PR<G>(KW_NULL)
+    ;
+
+bf::DefineNonTerminal<G, "BooleanLiteral"> BooleanLiteral
+    = bf::PR<G>(TRUE)
+    | bf::PR<G>(FALSE)
+    ;
+
+bf::DefineNonTerminal<G, "Literal"> Literal
+    = bf::PR<G>(StringLiteral)
+    | bf::PR<G>(NumericLiteral)
+    | bf::PR<G>(NullLiteral)
+    | bf::PR<G>(BooleanLiteral)
+    ;
+
+bf::DefineNonTerminal<G, "ArrayLiteral"> ArrayLiteral
+    = (SQUARE_LEFT + SQUARE_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "ComputedPropertyName"> ComputedPropertyName
+    = (SQUARE_LEFT + AssignmentExpression + SQUARE_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "PropertyName"> PropertyName
+    = bf::PR<G>(Identifier)
+    | bf::PR<G>(StringLiteral)
+    | bf::PR<G>(NumericLiteral)
+    | bf::PR<G>(ComputedPropertyName)
+    ;
+
+bf::DefineNonTerminal<G, "CoverInitializedName"> CoverInitializedName
+    = (Identifier + Initializer)
+    ;
+
+bf::DefineNonTerminal<G, "PropertyDefinition"> PropertyDefinition
+    = bf::PR<G>(Identifier)
+    | bf::PR<G>(CoverInitializedName)
+    | (PropertyName + COLON + AssignmentExpression)
+    | bf::PR<G>(MethodDefinition)
+    | (SPREAD + AssignmentExpression)
+    ;
+
+bf::DefineNonTerminal<G, "PropertyDefinitionList"> PropertyDefinitionList
+    = bf::PR<G>(PropertyDefinition)
+    | (PropertyDefinitionList + COMMA + PropertyDefinition)
+    ;
+
+bf::DefineNonTerminal<G, "ObjectLiteral"> ObjectLiteral
+    = (CURLY_LEFT + CURLY_RIGHT)
+    | (CURLY_LEFT + PropertyDefinitionList + CURLY_RIGHT)
+    | (CURLY_LEFT + PropertyDefinitionList + COMMA + CURLY_RIGHT)
     ;
 
 // TODO: Implement proper template parsing
@@ -219,7 +263,7 @@ bf::DefineNonTerminal<G, "FunctionBody"> FunctionBody
     = bf::PR<G>(FunctionStatementList)
     ;
 
-bf::DefineNonTerminal<G, "FunctionDeclaration"> FunctionDeclaration
+bf::DefineNonTerminal<G, "FunctionExpression"> FunctionExpression
     // Named Function
     = (FUNCTION + Identifier + PAR_LEFT + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
     | (FUNCTION + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
@@ -227,11 +271,6 @@ bf::DefineNonTerminal<G, "FunctionDeclaration"> FunctionDeclaration
     // Anonymous Function
     | (FUNCTION + PAR_LEFT + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
     | (FUNCTION + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
-    ;
-
-bf::DefineNonTerminal<G, "FunctionExpression"> FunctionExpression
-    = (FUNCTION + Identifier + PAR_LEFT + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
-    | (FUNCTION + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + FunctionBody + CURLY_RIGHT)
     ;
 
 bf::DefineNonTerminal<G, "AsyncGeneratorBody"> AsyncGeneratorBody
@@ -286,21 +325,6 @@ bf::DefineNonTerminal<G, "ClassStaticBlock"> ClassStaticBlock
     | (STATIC + CURLY_LEFT + ClassStaticBlockBody + CURLY_RIGHT)
     ;
 
-bf::DefineNonTerminal<G, "LiteralPropertyName"> LiteralPropertyName
-    = bf::PR<G>(Identifier)
-    | bf::PR<G>(StringLiteral)
-    | bf::PR<G>(NumericLiteral)
-    ;
-
-bf::DefineNonTerminal<G, "ComputedPropertyName"> ComputedPropertyName
-    = (SQUARE_LEFT + AssignmentExpression + SQUARE_RIGHT)
-    ;
-
-bf::DefineNonTerminal<G, "PropertyName"> PropertyName
-    = bf::PR<G>(LiteralPropertyName)
-    | bf::PR<G>(ComputedPropertyName)
-    ;
-
 bf::DefineNonTerminal<G, "ClassElementName"> ClassElementName
     = bf::PR<G>(PropertyName)
     | bf::PR<G>(PrivateIdentifier)
@@ -324,8 +348,8 @@ bf::DefineNonTerminal<G, "Initializer"> Initializer
     ;
 
 bf::DefineNonTerminal<G, "FieldDefinition"> FieldDefinition
-    = bf::PR<G>(ClassElementName)
-    | (ClassElementName + Initializer)
+    = (ClassElementName + Initializer)
+    | bf::PR<G>(ClassElementName)
     ;
 
 bf::DefineNonTerminal<G, "ClassElement"> ClassElement
@@ -445,6 +469,7 @@ bf::DefineNonTerminal<G, "CoverParenthesizedExpressionAndArrowParameterList"> Co
 bf::DefineNonTerminal<G, "PrimaryExpression"> PrimaryExpression
     = bf::PR<G>(THIS)
     | bf::PR<G>(Identifier)
+    | bf::PR<G>(Literal)
     | bf::PR<G>(ArrayLiteral)
     | bf::PR<G>(ObjectLiteral)
     | bf::PR<G>(FunctionExpression)
@@ -453,6 +478,7 @@ bf::DefineNonTerminal<G, "PrimaryExpression"> PrimaryExpression
     | bf::PR<G>(AsyncFunctionExpression)
     | bf::PR<G>(AsyncGeneratorExpression)
     // | bf::PR<G>(RegularExpressionLiteral)
+    | bf::PR<G>(TemplateLiteral)
     | bf::PR<G>(CoverParenthesizedExpressionAndArrowParameterList)
     ;
 
@@ -812,7 +838,6 @@ bf::DefineNonTerminal<G, "WithStatement"> WithStatement
 
 bf::DefineNonTerminal<G, "LabelledItem"> LabelledItem
     = bf::PR<G>(Statement)
-    | bf::PR<G>(FunctionDeclaration)
     ;
 
 bf::DefineNonTerminal<G, "LabelledStatement"> LabelledStatement
@@ -863,39 +888,6 @@ bf::DefineNonTerminal<G, "Statement"> Statement
     | bf::PR<G>(DebuggerStatement)
     ;
 
-bf::DefineNonTerminal<G, "GeneratorDeclaration"> GeneratorDeclaration
-    = (FUNCTION + STAR + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + CURLY_RIGHT)
-    | (FUNCTION + STAR + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + GeneratorBody + CURLY_RIGHT)
-    | (FUNCTION + STAR + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + CURLY_RIGHT)
-    | (FUNCTION + STAR + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + GeneratorBody + CURLY_RIGHT)
-    ;
-
-bf::DefineNonTerminal<G, "AsyncFunctionDeclaration"> AsyncFunctionDeclaration
-    = (ASYNC + FUNCTION + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + CURLY_RIGHT)
-    | (ASYNC + FUNCTION + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + AsyncFunctionBody + CURLY_RIGHT)
-    | (ASYNC + FUNCTION + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + CURLY_RIGHT)
-    | (ASYNC + FUNCTION + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + AsyncFunctionBody + CURLY_RIGHT)
-    ;
-
-bf::DefineNonTerminal<G, "AsyncGeneratorDeclaration"> AsyncGeneratorDeclaration
-    = (ASYNC + FUNCTION + STAR + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + CURLY_RIGHT)
-    | (ASYNC + FUNCTION + STAR + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + AsyncGeneratorBody + CURLY_RIGHT)
-    | (ASYNC + FUNCTION + STAR + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + CURLY_RIGHT)
-    | (ASYNC + FUNCTION + STAR + PAR_LEFT + FormalParameters + PAR_RIGHT + CURLY_LEFT + AsyncGeneratorBody + CURLY_RIGHT)
-    ;
-
-bf::DefineNonTerminal<G, "HoistableDeclaration"> HoistableDeclaration
-    = bf::PR<G>(FunctionDeclaration)
-    | bf::PR<G>(GeneratorDeclaration)
-    | bf::PR<G>(AsyncFunctionDeclaration)
-    | bf::PR<G>(AsyncGeneratorDeclaration)
-    ;
-
-bf::DefineNonTerminal<G, "ClassDeclaration"> ClassDeclaration
-    = (CLASS + Identifier + ClassTail)
-    | (CLASS + ClassTail)
-    ;
-
 bf::DefineNonTerminal<G, "LetOrConst"> LetOrConst
     = bf::PR<G>(LET)
     | bf::PR<G>(CONST)
@@ -917,9 +909,7 @@ bf::DefineNonTerminal<G, "LexicalDeclaration"> LexicalDeclaration
     ;
 
 bf::DefineNonTerminal<G, "Declaration"> Declaration
-    = bf::PR<G>(HoistableDeclaration)
-    | bf::PR<G>(ClassDeclaration)
-    | bf::PR<G>(LexicalDeclaration)
+    = bf::PR<G>(LexicalDeclaration)
     ;
 
 bf::DefineNonTerminal<G, "StatementListItem"> StatementListItem

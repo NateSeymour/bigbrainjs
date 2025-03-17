@@ -1,6 +1,7 @@
 #include "bbjs/engine/Engine.h"
 #include <ctre.hpp>
 #include <fstream>
+#include <iostream>
 #include <simdjson.h>
 
 using namespace bbjs;
@@ -94,6 +95,8 @@ std::expected<ExecutionSession, EngineError> Engine::Run(std::filesystem::path p
     // Load program text
     std::ifstream script_stream(path.c_str());
     std::string script_text(std::istreambuf_iterator<char>{script_stream}, {});
+
+    std::cout << script_text << std::endl;
 
     // Parse program text
     if (!this->parser_)
