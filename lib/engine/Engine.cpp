@@ -96,15 +96,13 @@ std::expected<ExecutionSession, EngineError> Engine::Run(std::filesystem::path p
     std::ifstream script_stream(path.c_str());
     std::string script_text(std::istreambuf_iterator<char>{script_stream}, {});
 
-    std::cout << script_text << std::endl;
-
     // Parse program text
-    if (!this->parser_)
+    if (!parser::Parser)
     {
-        return std::unexpected<EngineError>{this->parser_.error().what()};
+        return std::unexpected<EngineError>{parser::Parser.error().what()};
     }
 
-    auto result = this->parser_->Parse(script_text);
+    auto result = parser::Parser->Parse(script_text);
     if (!result)
     {
         return std::unexpected<EngineError>{result.error().what()};

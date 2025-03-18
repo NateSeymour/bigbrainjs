@@ -9,7 +9,7 @@ namespace bbjs::parser
     using ValueType = ast::Node;
     using GrammarType = bf::GrammarDefinition<ValueType>;
 
-    extern bf::DefineNonTerminal<GrammarType, "Script"> Script;
+    extern std::expected<bf::SLRParser<GrammarType>, bf::Error> Parser;
 } // namespace bbjs::parser
 
 #endif // PARSER_H

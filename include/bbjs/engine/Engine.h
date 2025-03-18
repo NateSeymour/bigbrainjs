@@ -32,7 +32,6 @@ namespace bbjs
 
     class Engine
     {
-        std::expected<bf::SLRParser<parser::GrammarType>, bf::Error> parser_ = bf::SLRParser<parser::GrammarType>::Build(parser::Script);
         FeatureFlags flags_;
 
     protected:

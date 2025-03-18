@@ -14,6 +14,7 @@ bf::DefineTerminal<G, R"(\/\*(.)*\*\/)"> MULTI_COMMENT;
 // KEYWORDS
 bf::DefineTerminal<G, R"(super)"> SUPER;
 bf::DefineTerminal<G, R"(import)"> IMPORT;
+bf::DefineTerminal<G, R"(as)"> AS;
 bf::DefineTerminal<G, R"(meta)"> META;
 bf::DefineTerminal<G, R"(from)"> FROM;
 
@@ -70,6 +71,19 @@ bf::DefineTerminal<G, R"(void)"> VOID;
 bf::DefineTerminal<G, R"(typeof)"> TYPEOF;
 
 // SYMBOLS
+bf::DefineTerminal<G, R"(\*=)"> STAR_ASSIGN;
+bf::DefineTerminal<G, R"(\/=)"> SLASH_ASSIGH;
+bf::DefineTerminal<G, R"(%=)"> PERCENT_ASSIGN;
+bf::DefineTerminal<G, R"(\+=)"> PLUS_ASSIGN;
+bf::DefineTerminal<G, R"(\-=)"> MINUS_ASSIGN;
+bf::DefineTerminal<G, R"(\<\<=)"> LSS_ASSIGN;
+bf::DefineTerminal<G, R"(\>\>=)"> RSS_ASSIGN;
+bf::DefineTerminal<G, R"(\>\>\>=)"> RSU_ASSIGN;
+bf::DefineTerminal<G, R"(&=)"> AND_ASSIGN;
+bf::DefineTerminal<G, R"(\^=)"> NOT_ASSIGN;
+bf::DefineTerminal<G, R"(\|=)"> PIPE_ASSIGN;
+bf::DefineTerminal<G, R"(\*\*=)"> DOUBLE_STAR_ASSIGN;
+
 bf::DefineTerminal<G, R"(;)"> SEMI;
 bf::DefineTerminal<G, R"(:)"> COLON;
 bf::DefineTerminal<G, R"(\.)"> DOT(bf::Left);
@@ -128,14 +142,17 @@ bf::DefineTerminal<G, R"(\<=)"> BINCOMP_LTE(bf::Left);
 bf::DefineTerminal<G, R"(\>=)"> BINCOMP_GTE(bf::Left);
 
 // LITERALS
-bf::DefineTerminal<G, R"(\d+(\.\d+)?)"> NUMBER;
+bf::DefineTerminal<G, R"(0b(0|1)+)"> NUMBER_BASE2;
+bf::DefineTerminal<G, R"(0o[0-7]+)"> NUMBER_BASE8;
+bf::DefineTerminal<G, R"(0x[\dabcdefABCDEF]+)"> NUMBER_BASE16;
+bf::DefineTerminal<G, R"(\d+(\.\d+)?)"> NUMBER_BASE10;
 
 bf::DefineTerminal<G, R"("[^"]*")"> DOUBLE_STRING;
 bf::DefineTerminal<G, R"('[^']*')"> SINGLE_STRING;
 bf::DefineTerminal<G, R"(`[^`]*`)"> FORMAT_STRING;
 
 // IDENTIFIERS
-bf::DefineTerminal<G, R"([a-zA-Z]+)"> IDENTIFIER;
+bf::DefineTerminal<G, R"([a-zA-Z]+[a-zA-Z\d]*)"> IDENTIFIER;
 
 /*
  * THE GRAMMAR
@@ -159,6 +176,11 @@ extern bf::DefineNonTerminal<G, "LexicalDeclaration"> LexicalDeclaration;
 extern bf::DefineNonTerminal<G, "AssignmentExpression"> AssignmentExpression;
 extern bf::DefineNonTerminal<G, "LeftHandSideExpression"> LeftHandSideExpression;
 
+bf::DefineNonTerminal<G, "Comment"> Comment
+    = bf::PR<G>(SINGLE_COMMENT)
+    | bf::PR<G>(MULTI_COMMENT)
+    ;
+
 bf::DefineNonTerminal<G, "Identifier"> Identifier
     = bf::PR<G>(IDENTIFIER)
     ;
@@ -173,7 +195,10 @@ bf::DefineNonTerminal<G, "StringLiteral"> StringLiteral
     ;
 
 bf::DefineNonTerminal<G, "NumericLiteral"> NumericLiteral
-    = bf::PR<G>(NUMBER)
+    = bf::PR<G>(NUMBER_BASE2)
+    | bf::PR<G>(NUMBER_BASE8)
+    | bf::PR<G>(NUMBER_BASE10)
+    | bf::PR<G>(NUMBER_BASE16)
     ;
 
 bf::DefineNonTerminal<G, "NullLiteral"> NullLiteral
@@ -192,8 +217,32 @@ bf::DefineNonTerminal<G, "Literal"> Literal
     | bf::PR<G>(BooleanLiteral)
     ;
 
+bf::DefineNonTerminal<G, "Elision"> Elision
+    = bf::PR<G>(COMMA)
+    | (Elision + COMMA)
+    ;
+
+bf::DefineNonTerminal<G, "SpreadElement"> SpreadElement
+    = (SPREAD + AssignmentExpression)
+    ;
+
+bf::DefineNonTerminal<G, "ElementList"> ElementList
+    = bf::PR<G>(AssignmentExpression)
+    | bf::PR<G>(SpreadElement)
+    | (Elision + AssignmentExpression)
+    | (Elision + SpreadElement)
+    | (ElementList + COMMA + AssignmentExpression)
+    | (ElementList + COMMA + SpreadElement)
+    | (ElementList + COMMA + Elision + AssignmentExpression)
+    | (ElementList + COMMA + Elision + SpreadElement)
+    ;
+
 bf::DefineNonTerminal<G, "ArrayLiteral"> ArrayLiteral
     = (SQUARE_LEFT + SQUARE_RIGHT)
+    | (SQUARE_LEFT + Elision + SQUARE_RIGHT)
+    | (SQUARE_LEFT + ElementList + SQUARE_RIGHT)
+    | (SQUARE_LEFT + ElementList  + COMMA + SQUARE_RIGHT)
+    | (SQUARE_LEFT + ElementList  + COMMA + Elision + SQUARE_RIGHT)
     ;
 
 bf::DefineNonTerminal<G, "ComputedPropertyName"> ComputedPropertyName
@@ -419,11 +468,6 @@ bf::DefineNonTerminal<G, "ObjectBindingPattern"> ObjectBindingPattern
     | (CURLY_LEFT + BindingPropertyList + COMMA + BindingRestProperty + CURLY_RIGHT)
     ;
 
-bf::DefineNonTerminal<G, "Elision"> Elision
-    = bf::PR<G>(COMMA)
-    | (Elision + COMMA)
-    ;
-
 bf::DefineNonTerminal<G, "BindingElisionElement"> BindingElisionElement
     = bf::PR<G>(BindingElement)
     | (Elision + BindingElement)
@@ -610,8 +654,9 @@ bf::DefineNonTerminal<G, "ExpressionBody"> ExpressionBody
     ;
 
 bf::DefineNonTerminal<G, "ConciseBody"> ConciseBody
-    = bf::PR<G>(ExpressionBody)
+    = bf::PR<G>(ExpressionBody).Short(CURLY_LEFT)
     | (CURLY_LEFT + FunctionBody + CURLY_RIGHT)
+    | (CURLY_LEFT + CURLY_RIGHT)
     ;
 
 bf::DefineNonTerminal<G, "ArrowFunction"> ArrowFunction
@@ -623,8 +668,9 @@ bf::DefineNonTerminal<G, "CoverCallExpressionAndAsyncArrowHead"> CoverCallExpres
     ;
 
 bf::DefineNonTerminal<G, "AsyncConciseBody"> AsyncConciseBody
-    = bf::PR<G>(ExpressionBody)
+    = bf::PR<G>(ExpressionBody).Short(CURLY_LEFT)
     | (CURLY_LEFT + AsyncFunctionBody + CURLY_RIGHT)
+    | (CURLY_LEFT + CURLY_RIGHT)
     ;
 
 bf::DefineNonTerminal<G, "AsyncArrowFunction"> AsyncArrowFunction
@@ -719,12 +765,28 @@ bf::DefineNonTerminal<G, "LeftHandSideExpression"> LeftHandSideExpression
     | bf::PR<G>(OptionalExpression)
     ;
 
+bf::DefineNonTerminal<G, "AssignementOperator"> AssignmentOperator
+    = bf::PR<G>(STAR_ASSIGN)
+    | bf::PR<G>(SLASH_ASSIGH)
+    | bf::PR<G>(PERCENT_ASSIGN)
+    | bf::PR<G>(PLUS_ASSIGN)
+    | bf::PR<G>(MINUS_ASSIGN)
+    | bf::PR<G>(LSS_ASSIGN)
+    | bf::PR<G>(RSS_ASSIGN)
+    | bf::PR<G>(RSU_ASSIGN)
+    | bf::PR<G>(AND_ASSIGN)
+    | bf::PR<G>(NOT_ASSIGN)
+    | bf::PR<G>(PIPE_ASSIGN)
+    | bf::PR<G>(DOUBLE_STAR_ASSIGN)
+    ;
+
 bf::DefineNonTerminal<G, "AssignmentExpression"> AssignmentExpression
     = bf::PR<G>(ConditionalExpression)
     | bf::PR<G>(YieldExpression)
     | bf::PR<G>(ArrowFunction)
     | bf::PR<G>(AsyncArrowFunction)
     | (LeftHandSideExpression + EQUAL + AssignmentExpression)
+    | (LeftHandSideExpression + AssignmentOperator + AssignmentExpression)
     ;
 
 bf::DefineNonTerminal<G, "Expression"> Expression
@@ -824,7 +886,7 @@ bf::DefineNonTerminal<G, "ContinueStatement"> ContinueStatement
 
 bf::DefineNonTerminal<G, "BreakStatement"> BreakStatement
     = (BREAK + COLON)
-    | (BREAK + Identifier + COLON)
+    | (BREAK + Identifier + SEMI)
     ;
 
 bf::DefineNonTerminal<G, "ReturnStatement"> ReturnStatement
@@ -873,9 +935,10 @@ bf::DefineNonTerminal<G, "DebuggerStatement"> DebuggerStatement
     ;
 
 bf::DefineNonTerminal<G, "Statement"> Statement
-    = bf::PR<G>(BlockStatement)
+    = bf::PR<G>(Comment)
+    | bf::PR<G>(BlockStatement)
     | bf::PR<G>(EmptyStatement)
-    | bf::PR<G>(ExpressionStatement)
+    | bf::PR<G>(ExpressionStatement).Short(CURLY_LEFT).Short(FUNCTION).Short(ASYNC).Short(CLASS).Short(LET)
     | bf::PR<G>(IfStatement)
     | bf::PR<G>(BreakableStatement)
     | bf::PR<G>(ContinueStatement)
@@ -923,13 +986,90 @@ bf::DefineNonTerminal<G, "StatementList"> StatementList
     ;
 
 bf::DefineNonTerminal<G, "Block"> Block
-    = (CURLY_LEFT + StatementList + CURLY_RIGHT)
+    = (CURLY_LEFT + CURLY_RIGHT)
+    | (CURLY_LEFT + StatementList + CURLY_RIGHT)
     ;
 
 bf::DefineNonTerminal<G, "ScriptBody"> ScriptBody
     = bf::PR<G>(StatementList)
     ;
 
-bf::DefineNonTerminal<G, "Script"> bbjs::parser::Script
+bf::DefineNonTerminal<G, "Script"> Script
     = bf::PR<G>(ScriptBody)
     ;
+
+bf::DefineNonTerminal<G, "ImportedBinding"> ImportedBinding
+    = bf::PR<G>(Identifier)
+    ;
+bf::DefineNonTerminal<G, "ModuleExportName"> ModuleExportName
+    = bf::PR<G>(Identifier)
+    | bf::PR<G>(StringLiteral)
+    ;
+
+bf::DefineNonTerminal<G, "ImportSpecifier"> ImportSpecifier
+    = bf::PR<G>(ImportedBinding)
+    | (ModuleExportName + AS + ImportedBinding)
+    ;
+
+bf::DefineNonTerminal<G, "ImportsList"> ImportsList
+    = bf::PR<G>(ImportSpecifier)
+    | (ImportsList + COMMA + ImportSpecifier)
+    ;
+
+bf::DefineNonTerminal<G, "NamedImports"> NamedImports
+    = (CURLY_LEFT + CURLY_RIGHT)
+    | (CURLY_LEFT + ImportsList + CURLY_RIGHT)
+    | (CURLY_LEFT + ImportsList + COMMA + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "NameSpaceImport"> NameSpaceImport
+    = (STAR + AS + ImportedBinding)
+    ;
+
+bf::DefineNonTerminal<G, "ImportedDefaultBinding"> ImportedDefaultBinding
+    = bf::PR<G>(ImportedBinding)
+    ;
+
+bf::DefineNonTerminal<G, "ModuleSpecifier"> ModuleSpecifier
+    = bf::PR<G>(StringLiteral)
+    ;
+
+bf::DefineNonTerminal<G, "FromClause"> FromClause
+    = (FROM + ModuleSpecifier)
+    ;
+
+bf::DefineNonTerminal<G, "ImportClause"> ImportClause
+    = bf::PR<G>(ImportedDefaultBinding)
+    | bf::PR<G>(NameSpaceImport)
+    | bf::PR<G>(NamedImports)
+    | (ImportedDefaultBinding + COMMA + NameSpaceImport)
+    | (ImportedDefaultBinding + COMMA + NamedImports)
+    ;
+
+bf::DefineNonTerminal<G, "ImportDeclaration"> ImportDeclaration
+    = (IMPORT + ImportClause + FromClause + SEMI)
+    | (IMPORT + ModuleSpecifier + SEMI)
+    ;
+
+bf::DefineNonTerminal<G, "ExportDeclaration"> ExportDeclaration;
+
+bf::DefineNonTerminal<G, "ModuleItem"> ModuleItem
+    = bf::PR<G>(ImportDeclaration)
+    | bf::PR<G>(ExportDeclaration)
+    | bf::PR<G>(StatementListItem)
+    ;
+
+bf::DefineNonTerminal<G, "ModuleItemList"> ModuleItemList
+    = bf::PR<G>(ModuleItem)
+    | (ModuleItemList + ModuleItem)
+    ;
+
+bf::DefineNonTerminal<G, "ModuleBody"> ModuleBody
+    = bf::PR<G>(ModuleItemList)
+    ;
+
+bf::DefineNonTerminal<G, "Module"> Module
+    = bf::PR<G>(ModuleBody)
+    ;
+
+std::expected<bf::SLRParser<GrammarType>, bf::Error> bbjs::parser::Parser = bf::SLRParser<G>::Build(Module);

@@ -29,4 +29,4 @@ const cyrb64 = (str, seed = 0) => {
 const cyrb64Hash = (str, seed = 0) => {
     const [h2, h1] = cyrb64(str, seed);
     return h2.toString(36).padStart(7, '0') + h1.toString(36).padStart(7, '0');
-}
+};

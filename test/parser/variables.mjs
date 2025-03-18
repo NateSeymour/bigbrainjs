@@ -18,10 +18,10 @@ const object = {
 };
 const array = [1, 2, 3, 4, 5];
 
-const foo1 = (a, b) => {
+const foo = (a, b) => {
     return a + b;
 };
 
-const foo2 = a => {
+const foo = a => {
     return a;
 };
