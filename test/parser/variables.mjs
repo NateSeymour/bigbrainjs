@@ -25,3 +25,5 @@ const foo = (a, b) => {
 const foo = a => {
     return a;
 };
+
+const foo = a => ({a});

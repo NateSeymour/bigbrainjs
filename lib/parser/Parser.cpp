@@ -1,6 +1,7 @@
-#include "bbjs/parser/Parser.h"
+#include "v6turbo/parser/Parser.h"
 
-using namespace bbjs::parser;
+using namespace v6;
+using namespace v6::parser;
 
 using G = GrammarType;
 
@@ -14,6 +15,7 @@ bf::DefineTerminal<G, R"(\/\*(.)*\*\/)"> MULTI_COMMENT;
 // KEYWORDS
 bf::DefineTerminal<G, R"(super)"> SUPER;
 bf::DefineTerminal<G, R"(import)"> IMPORT;
+bf::DefineTerminal<G, R"(export)"> EXPORT;
 bf::DefineTerminal<G, R"(as)"> AS;
 bf::DefineTerminal<G, R"(meta)"> META;
 bf::DefineTerminal<G, R"(from)"> FROM;
@@ -122,11 +124,11 @@ bf::DefineTerminal<G, R"(\])"> SQUARE_RIGHT;
 bf::DefineTerminal<G, R"(\()"> PAR_LEFT;
 bf::DefineTerminal<G, R"(\))"> PAR_RIGHT;
 
-bf::DefineTerminal<G, R"(&)"> BINOP_BIT_AND(bf::Left);
 bf::DefineTerminal<G, R"(&&)"> BINOP_AND(bf::Left);
+bf::DefineTerminal<G, R"(&)"> BINOP_BIT_AND(bf::Left);
 
-bf::DefineTerminal<G, R"(\|)"> BINOP_BIT_OR(bf::Left);
 bf::DefineTerminal<G, R"(\|\|)"> BINOP_OR(bf::Left);
+bf::DefineTerminal<G, R"(\|)"> BINOP_BIT_OR(bf::Left);
 
 bf::DefineTerminal<G, R"(\^)"> BINOP_BIT_XOR(bf::Left);
 
@@ -152,7 +154,7 @@ bf::DefineTerminal<G, R"('[^']*')"> SINGLE_STRING;
 bf::DefineTerminal<G, R"(`[^`]*`)"> FORMAT_STRING;
 
 // IDENTIFIERS
-bf::DefineTerminal<G, R"([a-zA-Z]+[a-zA-Z\d]*)"> IDENTIFIER;
+bf::DefineTerminal<G, R"([a-zA-Z$]+[a-zA-Z$\d]*)"> IDENTIFIER;
 
 /*
  * THE GRAMMAR
@@ -998,17 +1000,14 @@ bf::DefineNonTerminal<G, "Script"> Script
     = bf::PR<G>(ScriptBody)
     ;
 
-bf::DefineNonTerminal<G, "ImportedBinding"> ImportedBinding
-    = bf::PR<G>(Identifier)
-    ;
 bf::DefineNonTerminal<G, "ModuleExportName"> ModuleExportName
     = bf::PR<G>(Identifier)
     | bf::PR<G>(StringLiteral)
     ;
 
 bf::DefineNonTerminal<G, "ImportSpecifier"> ImportSpecifier
-    = bf::PR<G>(ImportedBinding)
-    | (ModuleExportName + AS + ImportedBinding)
+    = bf::PR<G>(ModuleExportName)
+    | (ModuleExportName + AS + Identifier)
     ;
 
 bf::DefineNonTerminal<G, "ImportsList"> ImportsList
@@ -1023,11 +1022,7 @@ bf::DefineNonTerminal<G, "NamedImports"> NamedImports
     ;
 
 bf::DefineNonTerminal<G, "NameSpaceImport"> NameSpaceImport
-    = (STAR + AS + ImportedBinding)
-    ;
-
-bf::DefineNonTerminal<G, "ImportedDefaultBinding"> ImportedDefaultBinding
-    = bf::PR<G>(ImportedBinding)
+    = (STAR + AS + Identifier)
     ;
 
 bf::DefineNonTerminal<G, "ModuleSpecifier"> ModuleSpecifier
@@ -1039,11 +1034,11 @@ bf::DefineNonTerminal<G, "FromClause"> FromClause
     ;
 
 bf::DefineNonTerminal<G, "ImportClause"> ImportClause
-    = bf::PR<G>(ImportedDefaultBinding)
+    = bf::PR<G>(Identifier)
     | bf::PR<G>(NameSpaceImport)
     | bf::PR<G>(NamedImports)
-    | (ImportedDefaultBinding + COMMA + NameSpaceImport)
-    | (ImportedDefaultBinding + COMMA + NamedImports)
+    | (Identifier + COMMA + NameSpaceImport)
+    | (Identifier + COMMA + NamedImports)
     ;
 
 bf::DefineNonTerminal<G, "ImportDeclaration"> ImportDeclaration
@@ -1051,7 +1046,36 @@ bf::DefineNonTerminal<G, "ImportDeclaration"> ImportDeclaration
     | (IMPORT + ModuleSpecifier + SEMI)
     ;
 
-bf::DefineNonTerminal<G, "ExportDeclaration"> ExportDeclaration;
+bf::DefineNonTerminal<G, "ExportSpecifier"> ExportSpecifier
+    = bf::PR<G>(ModuleExportName)
+    | (ModuleExportName + AS + ModuleExportName)
+    ;
+
+bf::DefineNonTerminal<G, "ExportsList"> ExportsList
+    = bf::PR<G>(ExportSpecifier)
+    | (ExportsList + COMMA + ExportSpecifier)
+    ;
+
+bf::DefineNonTerminal<G, "NamedExports"> NamedExports
+    = (CURLY_LEFT + CURLY_RIGHT)
+    | (CURLY_LEFT + ExportsList + CURLY_RIGHT)
+    | (CURLY_LEFT + ExportsList + COMMA + CURLY_RIGHT)
+    ;
+
+bf::DefineNonTerminal<G, "ExportFromClause"> ExportFromClause
+    = bf::PR<G>(STAR)
+    | (STAR + AS + ModuleExportName)
+    | bf::PR<G>(NamedExports)
+    ;
+
+bf::DefineNonTerminal<G, "ExportDeclaration"> ExportDeclaration
+    = (EXPORT + ExportFromClause + FromClause + SEMI)
+    | (EXPORT + NamedExports)
+    | (EXPORT + Declaration)
+    | (EXPORT + DEFAULT + FunctionExpression + SEMI)
+    | (EXPORT + DEFAULT + ClassExpression + SEMI)
+    //| (EXPORT + DEFAULT + AssignmentExpression + SEMI).Short(FUNCTION).Short(ASYNC).Short(CLASS)
+    ;
 
 bf::DefineNonTerminal<G, "ModuleItem"> ModuleItem
     = bf::PR<G>(ImportDeclaration)
@@ -1059,17 +1083,13 @@ bf::DefineNonTerminal<G, "ModuleItem"> ModuleItem
     | bf::PR<G>(StatementListItem)
     ;
 
-bf::DefineNonTerminal<G, "ModuleItemList"> ModuleItemList
+bf::DefineNonTerminal<G, "ModuleItemList", ast::NodeList> ModuleItemList
     = bf::PR<G>(ModuleItem)
     | (ModuleItemList + ModuleItem)
     ;
 
-bf::DefineNonTerminal<G, "ModuleBody"> ModuleBody
+bf::DefineNonTerminal<G, "Module"> Module
     = bf::PR<G>(ModuleItemList)
     ;
 
-bf::DefineNonTerminal<G, "Module"> Module
-    = bf::PR<G>(ModuleBody)
-    ;
-
-std::expected<bf::SLRParser<GrammarType>, bf::Error> bbjs::parser::Parser = bf::SLRParser<G>::Build(Module);
+std::expected<bf::SLRParser<GrammarType>, bf::Error> v6::parser::Parser = bf::SLRParser<G>::Build(Module);

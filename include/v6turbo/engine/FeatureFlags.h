@@ -5,10 +5,10 @@
 #include <unordered_map>
 #include <variant>
 
-namespace bbjs
+namespace v6
 {
     using FlagType = std::variant<bool, std::string>;
     using FeatureFlags = std::unordered_map<std::string, FlagType>;
-} // namespace bbjs
+} // namespace v6
 
 #endif // FEATUREFLAGS_H

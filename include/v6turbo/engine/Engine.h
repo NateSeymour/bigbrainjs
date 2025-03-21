@@ -7,9 +7,9 @@
 #include <string_view>
 #include "FeatureFlags.h"
 #include "Package.h"
-#include "bbjs/parser/Parser.h"
+#include "v6turbo/parser/Parser.h"
 
-namespace bbjs
+namespace v6
 {
     class ExecutionSession
     {
@@ -45,6 +45,6 @@ namespace bbjs
         Engine(std::string_view flags);
         Engine() = default;
     };
-} // namespace bbjs
+} // namespace v6
 
 #endif // ENGINE_H

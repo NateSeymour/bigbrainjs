@@ -7,7 +7,7 @@
 #include <filesystem>
 #include "SemanticVersion.h"
 
-namespace bbjs
+namespace v6
 {
     struct Package
     {

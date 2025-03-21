@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(bigbrainjs)
+project(v6turbo)
 
 set(CMAKE_CXX_STANDARD 23)
 
@@ -10,7 +10,7 @@ set(BUFFALO_ENABLE_TESTS OFF)
 FetchContent_Declare(
         buffalo
         GIT_REPOSITORY https://github.com/NateSeymour/buffalo.git
-        GIT_TAG v2.0.16
+        GIT_TAG v3.0.0
 )
 FetchContent_MakeAvailable(buffalo)
 
@@ -30,7 +30,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(simdjson)
 
-# GOOGLETEST
+# GOOGLE TEST
 FetchContent_Declare(
         gtest
         GIT_REPOSITORY https://github.com/google/googletest.git
@@ -38,20 +38,33 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(gtest)
 
-add_library(bigbrainjs
-        lib/engine/Engine.cpp
-        include/bbjs/engine/Engine.h
-        include/bbjs/engine/FeatureFlags.h
-        include/bbjs/parser/Node.h
-        include/bbjs/parser/Parser.h
-        lib/parser/Parser.cpp
-        include/bbjs/engine/Package.h
-        include/bbjs/engine/SemanticVersion.h
-        lib/engine/SemanticVersion.cpp)
-target_link_libraries(bigbrainjs PUBLIC buffalo ctre::ctre simdjson)
-target_include_directories(bigbrainjs PUBLIC include)
+# GOOGLE BENCHMARK
+FetchContent_Declare(
+        benchmark
+        GIT_REPOSITORY https://github.com/google/benchmark.git
+        GIT_TAG main
+)
+FetchContent_MakeAvailable(benchmark)
 
-add_executable(bigbrainjs-test test/scripts.test.cpp
-        test/h3.test.cpp
+add_library(v6turbo
+        lib/engine/Engine.cpp
+        include/v6turbo/engine/Engine.h
+        include/v6turbo/engine/FeatureFlags.h
+        include/v6turbo/parser/Node.h
+        include/v6turbo/parser/Parser.h
+        lib/parser/Parser.cpp
+        include/v6turbo/engine/Package.h
+        include/v6turbo/engine/SemanticVersion.h
+        lib/engine/SemanticVersion.cpp
+)
+target_link_libraries(v6turbo PUBLIC buffalo ctre::ctre simdjson)
+target_include_directories(v6turbo PUBLIC include)
+
+add_executable(v6turbo-test
         test/parser.test.cpp)
-target_link_libraries(bigbrainjs-test PRIVATE gtest_main bigbrainjs)
+target_link_libraries(v6turbo-test PRIVATE gtest_main v6turbo)
+
+add_executable(v6turbo-benchmark
+        benchmark/h3/h3.benchmark.cpp
+)
+target_link_libraries(v6turbo-benchmark PRIVATE benchmark_main v6turbo)

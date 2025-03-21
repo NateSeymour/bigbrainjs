@@ -4,7 +4,7 @@
 #include <compare>
 #include <string_view>
 
-namespace bbjs
+namespace v6
 {
     struct SemanticVersion
     {
