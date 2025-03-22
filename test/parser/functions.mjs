@@ -1,17 +1,20 @@
-const foo1 = () => {
-};
+/* ARROW FUNCTIONS */
+const foo = () => {};
 
-const foo2 = (a, b) => {
-};
+const foo = a => {};
 
-const foo3 = a => {
-};
+const foo = (a = 3, b = {}) => {};
 
-const foo4 = () => 1;
+const foo = () => 1;
 
-const foo5 = (a, b) => a;
+const foo = (a, b) => a;
 
-const foo6 = a => a;
+const foo = a => a;
 
-function foo() {
-}
+function foo() {}
+
+function *foo() {}
+
+async function foo() {}
+
+async function *foo() {}
