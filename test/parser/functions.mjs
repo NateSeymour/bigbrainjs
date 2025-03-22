@@ -12,3 +12,6 @@ const foo4 = () => 1;
 const foo5 = (a, b) => a;
 
 const foo6 = a => a;
+
+function foo() {
+}
