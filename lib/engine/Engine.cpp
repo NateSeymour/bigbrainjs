@@ -78,7 +78,7 @@ Package Engine::LoadPackageJson(std::filesystem::path path)
     return package;
 }
 
-std::expected<ExecutionSession, EngineError> Engine::Run(std::filesystem::path path)
+std::expected<ExecutionSessionHandle, EngineError> Engine::Run(std::filesystem::path path)
 {
     // Find and load the package.json
     auto package_path = Engine::LocatePackageJson(path);
@@ -90,23 +90,9 @@ std::expected<ExecutionSession, EngineError> Engine::Run(std::filesystem::path p
     Package package = Engine::LoadPackageJson(*package_path);
 
     // Initialize the ExecutionSession
-    ExecutionSession es{};
+    ExecutionSessionHandle es = std::make_unique<ExecutionSession>();
 
-    // Load program text
-    std::ifstream script_stream(path.c_str());
-    std::string script_text(std::istreambuf_iterator<char>{script_stream}, {});
-
-    // Parse program text
-    if (!parser::Parser)
-    {
-        return std::unexpected<EngineError>{parser::Parser.error().what()};
-    }
-
-    auto result = parser::Parser->Parse(script_text);
-    if (!result)
-    {
-        return std::unexpected<EngineError>{result.error().what()};
-    }
+    es->Submit<ParseJob>(std::move(path));
 
     // Compile program text
     // Hand off assembly to ExecutionSession

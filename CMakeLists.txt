@@ -56,9 +56,16 @@ add_library(v6turbo
         include/v6turbo/engine/Package.h
         include/v6turbo/engine/SemanticVersion.h
         lib/engine/SemanticVersion.cpp
+        include/v6turbo/engine/ExecutionSession.h
+        lib/engine/ExecutionSession.cpp
 )
 target_link_libraries(v6turbo PUBLIC buffalo ctre::ctre simdjson)
 target_include_directories(v6turbo PUBLIC include)
+
+add_executable(vroom
+        src/main.cpp
+)
+target_link_libraries(vroom PUBLIC v6turbo)
 
 add_executable(v6turbo-test
         test/parser.test.cpp)
