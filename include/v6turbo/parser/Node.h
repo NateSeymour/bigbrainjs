@@ -6,20 +6,16 @@
 #include <variant>
 #include <vector>
 
+namespace v6::parser
+{
+    struct NodeRef;
+}
+
 namespace v6::ast
 {
-    struct NodeList;
-    struct Import;
-    struct Export;
-    struct Statement;
-    struct Declaration;
-    struct Module;
-
-    using Node = std::variant<double, std::string_view, Import, Export, Module, NodeList>;
-
     struct NodeList
     {
-        std::vector<Node *> elements;
+        std::vector<parser::NodeRef> elements;
     };
 
     struct Import
@@ -45,6 +41,8 @@ namespace v6::ast
     {
         NodeList &body;
     };
+
+    using Node = std::variant<double, std::string_view, Import, Export, Module, NodeList>;
 } // namespace v6::ast
 
 #endif // NODE_H

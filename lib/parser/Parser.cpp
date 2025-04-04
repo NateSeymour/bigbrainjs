@@ -1061,12 +1061,23 @@ bf::DefineNonTerminal<G, "ModuleItem"> ModuleItem
     ;
 
 bf::DefineNonTerminal<G, "ModuleItemList", ast::NodeList> ModuleItemList
-    = bf::PR<G>(ModuleItem)
-    | (ModuleItemList + ModuleItem)
+    = bf::PR<G>(ModuleItem)<=>[](auto &$)
+    {
+        $ = ast::NodeList{ .elements = { $(0) }};
+    }
+    | (ModuleItemList + ModuleItem)<=>[](auto &$)
+    {
+        ModuleItemList($[0]).elements.push_back($(1));
+
+        $ = $[0];
+    }
     ;
 
-bf::DefineNonTerminal<G, "Module"> Module
-    = bf::PR<G>(ModuleItemList)
+bf::DefineNonTerminal<G, "Module", ast::Module> Module
+    = bf::PR<G>(ModuleItemList)<=>[](auto &$)
+    {
+        $ = ast::Module{ .body = ModuleItemList($[0]) };
+    }
     ;
 
 std::expected<bf::SLRParser<GrammarType>, bf::Error> v6::parser::Parser = bf::SLRParser<G>::Build(Module);
