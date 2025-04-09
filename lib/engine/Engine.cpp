@@ -92,7 +92,7 @@ std::expected<ExecutionSessionHandle, EngineError> Engine::Run(std::filesystem::
     // Initialize the ExecutionSession
     ExecutionSessionHandle es = std::make_unique<ExecutionSession>();
 
-    es->Submit<ParseJob>(std::move(path));
+    es->Submit<ReadSourceJob>(std::move(path));
 
     // Compile program text
     // Hand off assembly to ExecutionSession

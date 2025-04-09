@@ -10,28 +10,63 @@
 #include <deque>
 #include <filesystem>
 #include <format>
+#include <future>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <variant>
 #include <vector>
+#include "v6turbo/parser/Parser.h"
 
 namespace v6
 {
     class ExecutionSession;
 
-    struct ParseJob
+    struct Module
     {
         std::filesystem::path path;
+
+        std::shared_future<std::string> source;
+        std::shared_future<parser::NodeRef> ast;
     };
 
-    using Job = std::variant<ParseJob>;
+    /**
+     * Loads a Module's source text.
+     */
+    struct ReadSourceJob
+    {
+        std::promise<std::string> source;
+        Module &module;
+    };
+
+    /**
+     * Parses the source of a module into its AST.
+     */
+    struct ParseJob
+    {
+        std::promise<parser::NodeRef> ast;
+        Module &module;
+    };
+
+    struct RenderJob
+    {
+    };
+
+    /**
+     * Controls the loading, parsing and `main` execution of Module.
+     */
+    struct LoadModuleJob
+    {
+    };
+
+    using Job = std::variant<ReadSourceJob, ParseJob, RenderJob>;
 
     struct JobSummaryFunctor
     {
-        std::string operator()(ParseJob &job) const
+        std::string operator()(ReadSourceJob &job) const
         {
-            return std::format("ParseJob ({})", job.path.string());
+            return std::format("ReadSourceJob ({})", job.module.path.string());
         }
     };
 
@@ -47,7 +82,7 @@ namespace v6
         ExecutionSession &es;
         unsigned worker_id;
 
-        JobExecutionStatus operator()(ParseJob &job) const;
+        JobExecutionStatus operator()(ReadSourceJob &job) const;
     };
 
     class ExecutionSession
@@ -60,8 +95,12 @@ namespace v6
         std::mutex m_jobs_;
         std::deque<Job> jobs_;
 
-        std::atomic<int> time_card_;
+        std::atomic<int> active_workers_ = 0;
         std::vector<std::thread> company_;
+
+        std::map<std::string, Module> modules_;
+
+        int patience_ = 1;
 
         void Work(unsigned id);
 

@@ -8,23 +8,14 @@
 
 using namespace v6;
 
-JobExecutionStatus JobExecutionFunctor::operator()(ParseJob &job) const
+JobExecutionStatus JobExecutionFunctor::operator()(ReadSourceJob &job) const
 {
     // Load program text
-    std::ifstream script_stream(job.path.c_str());
-    std::string script_text(std::istreambuf_iterator<char>{script_stream}, {});
+    std::ifstream stream(job.module.path.c_str());
+    std::string source(std::istreambuf_iterator<char>{stream}, {});
 
-    // Parse program text
-    if (!parser::Parser)
-    {
-        return JobExecutionStatus::Failure;
-    }
-
-    auto result = parser::Parser->Parse(script_text);
-    if (!result)
-    {
-        return JobExecutionStatus::Failure;
-    }
+    job.source.set_value(std::move(source));
+    job.module.source = job.source.get_future().share();
 
     return JobExecutionStatus::Success;
 }
@@ -60,7 +51,7 @@ void ExecutionSession::Work(unsigned id)
             continue;
         }
 
-        Job job = this->jobs_.front();
+        Job job = std::move(this->jobs_.front());
         this->jobs_.pop_front();
 
         lk_jobs.unlock();
