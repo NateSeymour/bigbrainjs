@@ -11,11 +11,41 @@ using namespace v6;
 JobExecutionStatus JobExecutionFunctor::operator()(ReadSourceJob &job) const
 {
     // Load program text
-    std::ifstream stream(job.module.path.c_str());
+    std::ifstream stream(job.path.c_str());
     std::string source(std::istreambuf_iterator<char>{stream}, {});
 
     job.source.set_value(std::move(source));
     job.module.source = job.source.get_future().share();
+
+    return JobExecutionStatus::Success;
+}
+
+JobExecutionStatus JobExecutionFunctor::operator()(ParseJob &job) const
+{
+    return JobExecutionStatus::Success;
+}
+
+JobExecutionStatus JobExecutionFunctor::operator()(RenderJob &job) const
+{
+    return JobExecutionStatus::Success;
+}
+
+JobExecutionStatus JobExecutionFunctor::operator()(ExecuteJob &job) const
+{
+    this->es.Exit(0);
+
+    return JobExecutionStatus::Success;
+}
+
+JobExecutionStatus JobExecutionFunctor::operator()(LoadModuleJob &job) const
+{
+    // TODO: Generate unique name for module
+    auto module = this->es.GetOrEmplaceModule(job.path);
+
+    if (!module.source.valid())
+    {
+        this->es.Submit<ReadSourceJob>(module, job.path);
+    }
 
     return JobExecutionStatus::Success;
 }
@@ -28,7 +58,7 @@ void ExecutionSession::Work(unsigned id)
     while (true)
     {
         std::unique_lock lk_break_room(this->m_break_room_);
-        auto status = this->cv_break_room_.wait_for(lk_break_room, std::chrono::seconds(1));
+        auto status = this->cv_break_room_.wait_for(lk_break_room, std::chrono::milliseconds(100 * this->patience_));
 
         // Shutdown if requested
         if (this->shutdown_requested_)
@@ -40,7 +70,7 @@ void ExecutionSession::Work(unsigned id)
         // Only check job status if woken up on purpose
         if (status == std::cv_status::timeout)
         {
-            continue;
+            // continue;
         }
 
         // Grab next job if available.
@@ -84,7 +114,31 @@ void ExecutionSession::Work(unsigned id)
     }
 }
 
-ExecutionSession::ExecutionSession()
+void ExecutionSession::Exit(int result)
+{
+    this->result_.set_value(result);
+}
+
+std::future<int> ExecutionSession::GetResult()
+{
+    return this->result_.get_future();
+}
+
+void ExecutionSession::Shutdown()
+{
+    {
+        std::lock_guard lk(this->m_break_room_);
+        this->shutdown_requested_ = true;
+    }
+    this->cv_break_room_.notify_all();
+
+    for (auto &worker : this->company_)
+    {
+        worker.join();
+    }
+}
+
+ExecutionSession::ExecutionSession(std::filesystem::path pwd, unsigned patience) : pwd_(std::move(pwd)), patience_(std::max((unsigned)1, patience))
 {
     unsigned thread_max = std::max(static_cast<unsigned>(1), std::thread::hardware_concurrency());
     this->company_.reserve(thread_max);
@@ -99,14 +153,5 @@ ExecutionSession::ExecutionSession()
 
 ExecutionSession::~ExecutionSession()
 {
-    {
-        std::lock_guard lk(this->m_break_room_);
-        this->shutdown_requested_ = true;
-    }
-    this->cv_break_room_.notify_all();
-
-    for (auto &worker : this->company_)
-    {
-        worker.join();
-    }
+    this->Shutdown();
 }

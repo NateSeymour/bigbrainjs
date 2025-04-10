@@ -17,6 +17,7 @@
 #include <thread>
 #include <variant>
 #include <vector>
+#include "Package.h"
 #include "v6turbo/parser/Parser.h"
 
 namespace v6
@@ -25,8 +26,6 @@ namespace v6
 
     struct Module
     {
-        std::filesystem::path path;
-
         std::shared_future<std::string> source;
         std::shared_future<parser::NodeRef> ast;
     };
@@ -36,8 +35,9 @@ namespace v6
      */
     struct ReadSourceJob
     {
+        Module module;
+        std::filesystem::path path;
         std::promise<std::string> source;
-        Module &module;
     };
 
     /**
@@ -45,11 +45,15 @@ namespace v6
      */
     struct ParseJob
     {
+        Module module;
         std::promise<parser::NodeRef> ast;
-        Module &module;
     };
 
     struct RenderJob
+    {
+    };
+
+    struct ExecuteJob
     {
     };
 
@@ -58,15 +62,37 @@ namespace v6
      */
     struct LoadModuleJob
     {
+        bool preload = false;
+        std::filesystem::path path;
     };
 
-    using Job = std::variant<ReadSourceJob, ParseJob, RenderJob>;
+    using Job = std::variant<ReadSourceJob, ParseJob, RenderJob, ExecuteJob, LoadModuleJob>;
 
     struct JobSummaryFunctor
     {
         std::string operator()(ReadSourceJob &job) const
         {
-            return std::format("ReadSourceJob ({})", job.module.path.string());
+            return "ReadSourceJob";
+        }
+
+        std::string operator()(ParseJob &job) const
+        {
+            return "ParseJob";
+        }
+
+        std::string operator()(RenderJob &job) const
+        {
+            return "RenderJob";
+        }
+
+        std::string operator()(ExecuteJob &job) const
+        {
+            return "ExecuteJob";
+        }
+
+        std::string operator()(LoadModuleJob &job) const
+        {
+            return "LoadModuleJob";
         }
     };
 
@@ -83,10 +109,18 @@ namespace v6
         unsigned worker_id;
 
         JobExecutionStatus operator()(ReadSourceJob &job) const;
+        JobExecutionStatus operator()(ParseJob &job) const;
+        JobExecutionStatus operator()(RenderJob &job) const;
+        JobExecutionStatus operator()(ExecuteJob &job) const;
+        JobExecutionStatus operator()(LoadModuleJob &job) const;
     };
 
     class ExecutionSession
     {
+        std::promise<int> result_;
+
+        std::filesystem::path pwd_;
+
         std::atomic<bool> shutdown_requested_ = false;
 
         std::mutex m_break_room_;
@@ -98,11 +132,24 @@ namespace v6
         std::atomic<int> active_workers_ = 0;
         std::vector<std::thread> company_;
 
+        std::mutex m_modules_;
         std::map<std::string, Module> modules_;
 
-        int patience_ = 1;
+        unsigned patience_ = 1;
 
         void Work(unsigned id);
+
+    protected:
+        friend struct JobExecutionFunctor;
+
+        [[nodiscard]] Module GetOrEmplaceModule(std::string const &name)
+        {
+            std::lock_guard lk(this->m_modules_);
+
+            return this->modules_[name];
+        }
+
+        void Exit(int result);
 
     public:
         void Submit(Job &&job)
@@ -120,7 +167,11 @@ namespace v6
             this->Submit(JobType{std::forward<Args>(args)...});
         }
 
-        ExecutionSession();
+        [[nodiscard]] std::future<int> GetResult();
+
+        void Shutdown();
+
+        ExecutionSession(std::filesystem::path pwd, unsigned patience = 1);
         ~ExecutionSession();
 
         ExecutionSession(ExecutionSession &&) = delete;

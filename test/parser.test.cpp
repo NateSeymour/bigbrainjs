@@ -10,6 +10,9 @@ protected:
     {
         auto es = this->engine_.Run(std::move(path));
         ASSERT_TRUE(es) << es.error().GetError();
+
+        auto result = es.value()->GetResult();
+        ASSERT_EQ(result.get(), 0);
     }
 };
 

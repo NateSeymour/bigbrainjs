@@ -90,9 +90,9 @@ std::expected<ExecutionSessionHandle, EngineError> Engine::Run(std::filesystem::
     Package package = Engine::LoadPackageJson(*package_path);
 
     // Initialize the ExecutionSession
-    ExecutionSessionHandle es = std::make_unique<ExecutionSession>();
+    ExecutionSessionHandle es = std::make_unique<ExecutionSession>(*package_path);
 
-    es->Submit<ReadSourceJob>(std::move(path));
+    es->Submit<LoadModuleJob>(false, std::move(path));
 
     // Compile program text
     // Hand off assembly to ExecutionSession

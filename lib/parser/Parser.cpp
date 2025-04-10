@@ -1063,13 +1063,13 @@ bf::DefineNonTerminal<G, "ModuleItem"> ModuleItem
 bf::DefineNonTerminal<G, "ModuleItemList", ast::NodeList> ModuleItemList
     = bf::PR<G>(ModuleItem)<=>[](auto &$)
     {
-        $ = ast::NodeList{ .elements = { $(0) }};
+        //$ = ast::NodeList{ .elements = { $(0) }};
     }
     | (ModuleItemList + ModuleItem)<=>[](auto &$)
     {
-        ModuleItemList($[0]).elements.push_back($(1));
+        //ModuleItemList($[0]).elements.push_back($(1));
 
-        $ = $[0];
+        //$ = $[0];
     }
     ;
 
