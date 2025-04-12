@@ -22,6 +22,7 @@ JobExecutionStatus JobExecutionFunctor::operator()(ReadSourceJob &job) const
 
 JobExecutionStatus JobExecutionFunctor::operator()(ParseJob &job) const
 {
+
     return JobExecutionStatus::Success;
 }
 
@@ -40,11 +41,21 @@ JobExecutionStatus JobExecutionFunctor::operator()(ExecuteJob &job) const
 JobExecutionStatus JobExecutionFunctor::operator()(LoadModuleJob &job) const
 {
     // TODO: Generate unique name for module
-    auto module = this->es.GetOrEmplaceModule(job.path);
+    auto module = this->es.GetOrEmplaceModule(job.path.string());
 
     if (!module.source.valid())
     {
         this->es.Submit<ReadSourceJob>(module, job.path);
+    }
+
+    if (!module.ast.valid())
+    {
+        this->es.Submit<ParseJob>(module);
+    }
+
+    if (!job.preload)
+    {
+        this->es.Submit<ExecuteJob>();
     }
 
     return JobExecutionStatus::Success;

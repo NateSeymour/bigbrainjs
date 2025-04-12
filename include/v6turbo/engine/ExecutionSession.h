@@ -24,10 +24,53 @@ namespace v6
 {
     class ExecutionSession;
 
+    template<typename T>
+    class SharedAttribute
+    {
+        std::mutex m_value_;
+        std::condition_variable cv_value_;
+
+        std::optional<T> value_;
+
+    protected:
+        T const &Set(T &&value)
+        {
+            {
+                std::lock_guard lk(this->m_value_);
+
+                this->value_ = std::move(value);
+            }
+
+            this->cv_value_.notify_all();
+
+            return this->value_;
+        }
+
+    public:
+        [[nodiscard]] T const &Get()
+        {
+            if (!this->value_.has_value())
+            {
+                std::unique_lock lk(this->m_value_);
+                this->cv_value_.wait(lk, [this] { return this->value_.has_value(); });
+            }
+
+            return this->value_;
+        }
+
+        SharedAttribute<T> &operator=(T &&value)
+        {
+            this->Set(std::move(value));
+
+            return *this;
+        }
+    };
+
     struct Module
     {
-        std::shared_future<std::string> source;
-        std::shared_future<parser::NodeRef> ast;
+        SharedAttribute<std::filesystem::path> path;
+        SharedAttribute<std::string> source;
+        SharedAttribute<parser::NodeRef> ast;
     };
 
     /**
@@ -35,9 +78,7 @@ namespace v6
      */
     struct ReadSourceJob
     {
-        Module module;
-        std::filesystem::path path;
-        std::promise<std::string> source;
+        Module &module;
     };
 
     /**
@@ -45,16 +86,17 @@ namespace v6
      */
     struct ParseJob
     {
-        Module module;
-        std::promise<parser::NodeRef> ast;
+        Module &module;
     };
 
     struct RenderJob
     {
+        Module &module;
     };
 
     struct ExecuteJob
     {
+        Module &module;
     };
 
     /**
@@ -62,7 +104,11 @@ namespace v6
      */
     struct LoadModuleJob
     {
-        bool preload = false;
+        std::filesystem::path path;
+    };
+
+    struct RunMainModuleJob
+    {
         std::filesystem::path path;
     };
 
@@ -117,8 +163,6 @@ namespace v6
 
     class ExecutionSession
     {
-        std::promise<int> result_;
-
         std::filesystem::path pwd_;
 
         std::atomic<bool> shutdown_requested_ = false;
@@ -142,7 +186,7 @@ namespace v6
     protected:
         friend struct JobExecutionFunctor;
 
-        [[nodiscard]] Module GetOrEmplaceModule(std::string const &name)
+        [[nodiscard]] Module &GetOrEmplaceModule(std::string const &name)
         {
             std::lock_guard lk(this->m_modules_);
 
