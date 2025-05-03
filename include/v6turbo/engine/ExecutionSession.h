@@ -163,7 +163,7 @@ namespace v6
 
     class ExecutionSession
     {
-        std::filesystem::path pwd_;
+        Package package_;
 
         std::atomic<bool> shutdown_requested_ = false;
 
@@ -215,7 +215,7 @@ namespace v6
 
         void Shutdown();
 
-        ExecutionSession(std::filesystem::path pwd, unsigned patience = 1);
+        ExecutionSession(Package package, unsigned patience = 1);
         ~ExecutionSession();
 
         ExecutionSession(ExecutionSession &&) = delete;

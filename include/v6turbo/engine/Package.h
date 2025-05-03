@@ -15,6 +15,7 @@ namespace v6
 
         std::optional<std::string> name;
         std::optional<SemanticVersion> version;
+        std::optional<std::string> type;
         std::optional<std::string> main;
         std::map<std::string, std::string> scripts;
         std::optional<std::string> author;

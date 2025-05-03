@@ -30,10 +30,14 @@ namespace v6
         FeatureFlags flags_;
 
     protected:
-        [[nodiscard]] static std::optional<std::filesystem::path> LocatePackageJson(std::filesystem::path path);
         [[nodiscard]] static Package LoadPackageJson(std::filesystem::path path);
 
     public:
+        /**
+         * Accepts a path to a v6 application directory and immediately begins execution.
+         * @param path Path to ".v6" directory containing a v6 program.
+         * @return Handle to the ExecutionSession running the application or an error.
+         */
         [[nodiscard]] std::expected<ExecutionSessionHandle, EngineError> Run(std::filesystem::path path);
 
         Engine(FeatureFlags flags);

@@ -68,10 +68,5 @@ add_executable(vroom
 target_link_libraries(vroom PUBLIC v6turbo)
 
 add_executable(v6turbo-test
-        test/parser.test.cpp)
+        test/engine.test.cpp)
 target_link_libraries(v6turbo-test PRIVATE gtest_main v6turbo)
-
-add_executable(v6turbo-benchmark
-        benchmark/h3/h3.benchmark.cpp
-)
-target_link_libraries(v6turbo-benchmark PRIVATE benchmark_main v6turbo)

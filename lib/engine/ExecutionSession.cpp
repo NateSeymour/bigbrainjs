@@ -41,7 +41,7 @@ JobExecutionStatus JobExecutionFunctor::operator()(ExecuteJob &job) const
 JobExecutionStatus JobExecutionFunctor::operator()(LoadModuleJob &job) const
 {
     // TODO: Generate unique name for module
-    auto module = this->es.GetOrEmplaceModule(job.path.string());
+    auto &module = this->es.GetOrEmplaceModule(job.path.string());
 
     if (!module.source.valid())
     {
@@ -149,7 +149,7 @@ void ExecutionSession::Shutdown()
     }
 }
 
-ExecutionSession::ExecutionSession(std::filesystem::path pwd, unsigned patience) : pwd_(std::move(pwd)), patience_(std::max((unsigned)1, patience))
+ExecutionSession::ExecutionSession(Package package, unsigned patience) : package_(std::move(package)), patience_(std::max((unsigned)1, patience))
 {
     unsigned thread_max = std::max(static_cast<unsigned>(1), std::thread::hardware_concurrency());
     this->company_.reserve(thread_max);

@@ -1,37 +1,9 @@
 #include "v6turbo/engine/Engine.h"
 #include <ctre.hpp>
 #include <fstream>
-#include <iostream>
 #include <simdjson.h>
 
 using namespace v6;
-
-std::optional<std::filesystem::path> Engine::LocatePackageJson(std::filesystem::path path)
-{
-    if (!path.is_absolute())
-    {
-        path = std::filesystem::current_path() / path;
-    }
-
-    path.make_preferred();
-
-    auto fs_root = path.root_path();
-    while ((path = path.parent_path()) != fs_root)
-    {
-        if (!std::filesystem::is_directory(path))
-        {
-            continue;
-        }
-
-        std::filesystem::path package_json = path / "package.json";
-        if (std::filesystem::exists(package_json))
-        {
-            return package_json;
-        }
-    }
-
-    return std::nullopt;
-}
 
 Package Engine::LoadPackageJson(std::filesystem::path path)
 {
@@ -57,6 +29,10 @@ Package Engine::LoadPackageJson(std::filesystem::path path)
         {
             package.version = SemanticVersion::From(value.get_string().value());
         }
+        else if (key == "type")
+        {
+            package.type = value.get_string().value();
+        }
         else if (key == "main")
         {
             package.main = value.get_string().value();
@@ -80,17 +56,29 @@ Package Engine::LoadPackageJson(std::filesystem::path path)
 
 std::expected<ExecutionSessionHandle, EngineError> Engine::Run(std::filesystem::path path)
 {
-    // Find and load the package.json
-    auto package_path = Engine::LocatePackageJson(path);
-    if (!package_path)
+    if (!std::filesystem::is_directory(path) || path.extension() != ".v6")
     {
-        return std::unexpected<EngineError>{"Failed to locate package.json"};
+        return std::unexpected<EngineError>{"Expected a directory with the extension \".v6\"."};
     }
 
-    Package package = Engine::LoadPackageJson(*package_path);
+    auto const package_path = path / "package.json";
+    if (!std::filesystem::exists(package_path))
+    {
+        return std::unexpected<EngineError>{"Expected v6 directory to contain a top-level package.json."};
+    }
 
-    // Initialize the ExecutionSession
-    ExecutionSessionHandle es = std::make_unique<ExecutionSession>(*package_path);
+    Package package = Engine::LoadPackageJson(package_path);
+    if (!package.main.has_value())
+    {
+        return std::unexpected<EngineError>{"Expected v6 application to have a defined entrypoint."};
+    }
+
+    if (package.type != "module")
+    {
+        return std::unexpected<EngineError>{"v6turbo only supports ECMAScript modules and requires them to be explicitly defined in the package.json."};
+    }
+
+    ExecutionSessionHandle es = std::make_unique<ExecutionSession>(std::move(package));
 
     es->Submit<LoadModuleJob>(false, std::move(path));
 
