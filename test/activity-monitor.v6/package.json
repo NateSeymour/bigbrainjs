@@ -1,0 +1,12 @@
+{
+  "name": "activity-monitor",
+  "version": "0.0.0",
+  "description": "Simple program that gathers a list of all running programs on the system and displays them to the console or serves the data over HTTP.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
