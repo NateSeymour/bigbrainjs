@@ -8,159 +8,38 @@
 
 using namespace v6;
 
-JobExecutionStatus JobExecutionFunctor::operator()(ReadSourceJob &job) const
+ContextualModuleThread::ContextualModuleThread(ExecutionSession &es, std::filesystem::path relative_path) : es_(es), path_(std::move(relative_path))
 {
-    // Load program text
-    std::ifstream stream(job.path.c_str());
-    std::string source(std::istreambuf_iterator<char>{stream}, {});
+    // Load Source
+    auto const absolute_path = this->es_.package.root / this->path_;
+    std::ifstream file(absolute_path);
 
-    job.source.set_value(std::move(source));
-    job.module.source = job.source.get_future().share();
+    this->source_ = {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
 
-    return JobExecutionStatus::Success;
+    std::cout << "[" << absolute_path << "] Loaded source." << std::endl;
+    std::cout << this->source_ << std::endl;
 }
 
-JobExecutionStatus JobExecutionFunctor::operator()(ParseJob &job) const
-{
+void ExecutionSession::Exit(int result) {}
 
-    return JobExecutionStatus::Success;
+ContextualModuleThread &ExecutionSession::InsertModule(std::filesystem::path relative_path)
+{
+    std::lock_guard lk(this->m_modules_);
+
+    auto [it, inserted] = this->modules_.emplace(relative_path.string(), ContextualModuleThread{*this, relative_path});
+
+    return it->second;
 }
 
-JobExecutionStatus JobExecutionFunctor::operator()(RenderJob &job) const
+void ExecutionSession::RunMain()
 {
-    return JobExecutionStatus::Success;
+    std::cout << "[ExecutionSession] Running main module from " << *this->package.main << "." << std::endl;
+    (void)this->InsertModule(*this->package.main);
 }
 
-JobExecutionStatus JobExecutionFunctor::operator()(ExecuteJob &job) const
-{
-    this->es.Exit(0);
+void ExecutionSession::Shutdown() {}
 
-    return JobExecutionStatus::Success;
-}
-
-JobExecutionStatus JobExecutionFunctor::operator()(LoadModuleJob &job) const
-{
-    // TODO: Generate unique name for module
-    auto &module = this->es.GetOrEmplaceModule(job.path.string());
-
-    if (!module.source.valid())
-    {
-        this->es.Submit<ReadSourceJob>(module, job.path);
-    }
-
-    if (!module.ast.valid())
-    {
-        this->es.Submit<ParseJob>(module);
-    }
-
-    if (!job.preload)
-    {
-        this->es.Submit<ExecuteJob>();
-    }
-
-    return JobExecutionStatus::Success;
-}
-
-void ExecutionSession::Work(unsigned id)
-{
-    JobSummaryFunctor summarizer{};
-    JobExecutionFunctor executor{*this, id};
-
-    while (true)
-    {
-        std::unique_lock lk_break_room(this->m_break_room_);
-        auto status = this->cv_break_room_.wait_for(lk_break_room, std::chrono::milliseconds(100 * this->patience_));
-
-        // Shutdown if requested
-        if (this->shutdown_requested_)
-        {
-            std::cout << std::format("[ExecutionSession.Worker({})] Received shutdown request.\n", id);
-            return;
-        }
-
-        // Only check job status if woken up on purpose
-        if (status == std::cv_status::timeout)
-        {
-            // continue;
-        }
-
-        // Grab next job if available.
-        std::unique_lock lk_jobs(this->m_jobs_);
-        if (this->jobs_.empty())
-        {
-            std::cerr << std::format("[ExecutionSession.Worker({})] WARNING Worker woken up without available job.\n", id);
-            continue;
-        }
-
-        Job job = std::move(this->jobs_.front());
-        this->jobs_.pop_front();
-
-        lk_jobs.unlock();
-
-        // Run job
-        std::cout << std::format("[ExecutionSession.Worker({})] Received {}. Running...\n", id, std::visit(summarizer, job));
-
-        auto result = std::visit(executor, job);
-        switch (result)
-        {
-            case JobExecutionStatus::Failure:
-            {
-                throw std::runtime_error("unhandled job failure");
-            }
-
-            case JobExecutionStatus::Success:
-            {
-                std::cout << std::format("[ExecutionSession.Worker({})] Finished job successfully.\n", id);
-                break;
-            }
-
-            case JobExecutionStatus::Deferred:
-            {
-                std::cout << std::format("[ExecutionSession.Worker({})] Job has been deferred.\n", id);
-
-                this->Submit(std::move(job));
-                break;
-            }
-        }
-    }
-}
-
-void ExecutionSession::Exit(int result)
-{
-    this->result_.set_value(result);
-}
-
-std::future<int> ExecutionSession::GetResult()
-{
-    return this->result_.get_future();
-}
-
-void ExecutionSession::Shutdown()
-{
-    {
-        std::lock_guard lk(this->m_break_room_);
-        this->shutdown_requested_ = true;
-    }
-    this->cv_break_room_.notify_all();
-
-    for (auto &worker : this->company_)
-    {
-        worker.join();
-    }
-}
-
-ExecutionSession::ExecutionSession(Package package, unsigned patience) : package_(std::move(package)), patience_(std::max((unsigned)1, patience))
-{
-    unsigned thread_max = std::max(static_cast<unsigned>(1), std::thread::hardware_concurrency());
-    this->company_.reserve(thread_max);
-
-    for (unsigned i = 0; i < thread_max; i++)
-    {
-        this->company_.emplace_back(&ExecutionSession::Work, this, i);
-    }
-
-    std::cout << std::format("[ExecutionSession] Initialized {} workers.\n", thread_max);
-}
+ExecutionSession::ExecutionSession(Package package) : package(std::move(package)) {}
 
 ExecutionSession::~ExecutionSession()
 {

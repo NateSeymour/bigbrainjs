@@ -80,7 +80,7 @@ std::expected<ExecutionSessionHandle, EngineError> Engine::Run(std::filesystem::
 
     ExecutionSessionHandle es = std::make_unique<ExecutionSession>(std::move(package));
 
-    es->Submit<LoadModuleJob>(false, std::move(path));
+    es->RunMain();
 
     // Compile program text
     // Hand off assembly to ExecutionSession
