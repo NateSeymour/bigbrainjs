@@ -32,7 +32,9 @@ namespace v6
         std::string source_;
         // parser::NodeRef ast_;
 
-        // std::jthread thread_;
+        std::thread thread_;
+
+        void Log(char const *log);
 
         /**
          * Called before making any external calls.
@@ -46,6 +48,11 @@ namespace v6
         /// 5. standby for requests
         void Worker();
 
+    protected:
+        friend class ExecutionSession;
+
+        void Join();
+
     public:
         ContextualModuleThread(ExecutionSession &es, std::filesystem::path relative_path);
     };
@@ -53,7 +60,7 @@ namespace v6
     class ExecutionSession
     {
         std::mutex m_modules_;
-        std::map<std::string, ContextualModuleThread> modules_;
+        std::map<std::string, std::unique_ptr<ContextualModuleThread>> modules_;
 
     protected:
         friend class ContextualModuleThread;

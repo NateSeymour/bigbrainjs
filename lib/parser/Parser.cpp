@@ -1076,7 +1076,7 @@ bf::DefineNonTerminal<G, "ModuleItemList", ast::NodeList> ModuleItemList
 bf::DefineNonTerminal<G, "Module", ast::Module> Module
     = bf::PR<G>(ModuleItemList)<=>[](auto &$)
     {
-        $ = ast::Module{ .body = ModuleItemList($[0]) };
+        // $ = ast::Module{ .body = ModuleItemList($[0]) };
     }
     ;
 
