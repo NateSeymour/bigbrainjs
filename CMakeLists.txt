@@ -10,7 +10,7 @@ set(BUFFALO_ENABLE_TESTS OFF)
 FetchContent_Declare(
         buffalo
         GIT_REPOSITORY https://github.com/NateSeymour/buffalo.git
-        GIT_TAG v3.0.2
+        GIT_TAG v3.0.4
 )
 FetchContent_MakeAvailable(buffalo)
 
