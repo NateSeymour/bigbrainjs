@@ -74,7 +74,7 @@ bf::DefineTerminal<G, R"(typeof)"> TYPEOF;
 
 // SYMBOLS
 bf::DefineTerminal<G, R"(\*=)"> STAR_ASSIGN;
-bf::DefineTerminal<G, R"(\/=)"> SLASH_ASSIGH;
+bf::DefineTerminal<G, R"(\/=)"> SLASH_ASSIGN;
 bf::DefineTerminal<G, R"(%=)"> PERCENT_ASSIGN;
 bf::DefineTerminal<G, R"(\+=)"> PLUS_ASSIGN;
 bf::DefineTerminal<G, R"(\-=)"> MINUS_ASSIGN;
@@ -308,7 +308,13 @@ bf::DefineNonTerminal<G, "UniqueFormalParameters"> UniqueFormalParameters
 
 bf::DefineNonTerminal<G, "FunctionExpression"> FunctionExpression
     // Parameterless Named Function
-    = (FUNCTION + Identifier + PAR_LEFT + PAR_RIGHT + Block)
+    = (FUNCTION + Identifier + PAR_LEFT + PAR_RIGHT + Block)<=>[](auto &$)
+    {
+        $ = ast::FunctionDefinitionNode{
+            .name = Identifier($[1]),
+            .body = $[4],
+        };
+    }
 
     // Parametrized Named Function
     | (FUNCTION + Identifier + PAR_LEFT + FormalParameters + PAR_RIGHT + Block)
@@ -745,7 +751,7 @@ bf::DefineNonTerminal<G, "LeftHandSideExpression"> LeftHandSideExpression
 
 bf::DefineNonTerminal<G, "AssignementOperator"> AssignmentOperator
     = bf::PR<G>(STAR_ASSIGN)
-    | bf::PR<G>(SLASH_ASSIGH)
+    | bf::PR<G>(SLASH_ASSIGN)
     | bf::PR<G>(PERCENT_ASSIGN)
     | bf::PR<G>(PLUS_ASSIGN)
     | bf::PR<G>(MINUS_ASSIGN)
@@ -1061,16 +1067,7 @@ bf::DefineNonTerminal<G, "ModuleItem"> ModuleItem
     ;
 
 bf::DefineNonTerminal<G, "ModuleItemList", ast::NodeList> ModuleItemList
-    = bf::PR<G>(ModuleItem)<=>[](auto &$)
-    {
-        $ = ast::NodeList{ .elements = { $(0) }};
-    }
-    | (ModuleItemList + ModuleItem)<=>[](auto &$)
-    {
-        //ModuleItemList($[0]).elements.push_back($(1));
-
-        $ = $[0];
-    }
+    = bf::PR<G>(ModuleItem) % bf::Repeating
     ;
 
 bf::DefineNonTerminal<G, "Module", ast::Module> Module

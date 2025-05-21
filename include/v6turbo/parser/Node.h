@@ -2,9 +2,7 @@
 #define NODE_H
 
 #include <string_view>
-#include <unordered_map>
 #include <variant>
-#include <vector>
 
 namespace v6::parser
 {
@@ -13,36 +11,48 @@ namespace v6::parser
 
 namespace v6::ast
 {
-    struct NodeList
-    {
-        std::vector<parser::NodeRef> elements;
-    };
+    struct NodeBase;
+    struct StringNode;
+    struct NumericNode;
+    struct ListNode;
+    struct ModuleNode;
 
-    struct Import
-    {
-        std::string_view module_name;
-        std::vector<std::pair<std::string_view, std::string_view>> named_imports;
-    };
+    using Node = std::variant<NodeBase, StringNode, NumericNode>;
 
-    struct Export
-    {
-    };
-
-    struct Statement
+    /**
+     * Empty struct for constructing Nodes.
+     */
+    struct NodeBase
     {
     };
 
-    struct Declaration
+    template<typename ValueType>
+    struct LiteralNode : NodeBase
     {
-        bool mut = false;
+        ValueType value;
     };
 
-    struct Module
+    struct StringNode : LiteralNode<std::string_view>
     {
-        NodeList &body;
     };
 
-    using Node = std::variant<double, std::string_view, Import, Export, Module, NodeList>;
+    struct NumericNode : LiteralNode<double>
+    {
+    };
+
+    struct ListNode : NodeBase
+    {
+    };
+
+    struct ModuleNode : NodeBase
+    {
+    };
+
+    struct FunctionDefinitionNode : NodeBase
+    {
+        std::string_view name;
+        NodeBase &body;
+    };
 } // namespace v6::ast
 
 #endif // NODE_H

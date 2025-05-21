@@ -44,7 +44,7 @@ void ContextualModuleThread::Join()
     this->thread_.join();
 }
 
-ContextualModuleThread::ContextualModuleThread(ExecutionSession &es, std::filesystem::path relative_path) : es_(es), path_(std::move(relative_path)), thread_(&Worker, this) {}
+ContextualModuleThread::ContextualModuleThread(ExecutionSession &es, std::filesystem::path relative_path) : es_(es), path_(std::move(relative_path)), thread_(&ContextualModuleThread::Worker, this) {}
 
 void ExecutionSession::Exit(int result) {}
 

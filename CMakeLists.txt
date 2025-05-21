@@ -14,6 +14,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(buffalo)
 
+# CITY
+set(CITY_ENABLE_TESTS OFF)
+FetchContent_Declare(
+        city
+        GIT_REPOSITORY https://github.com/NateSeymour/city.git
+        GIT_TAG v0.4.4
+)
+FetchContent_MakeAvailable(city)
+
 # CTRE
 FetchContent_Declare(
         ctre
@@ -58,8 +67,10 @@ add_library(v6turbo
         lib/engine/SemanticVersion.cpp
         include/v6turbo/engine/ExecutionSession.h
         lib/engine/ExecutionSession.cpp
+        lib/compiler/Compiler.cpp
+        lib/compiler/Compiler.h
 )
-target_link_libraries(v6turbo PUBLIC buffalo ctre::ctre simdjson)
+target_link_libraries(v6turbo PUBLIC buffalo city ctre::ctre simdjson)
 target_include_directories(v6turbo PUBLIC include)
 
 add_executable(vroom
